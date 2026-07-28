@@ -1,0 +1,41 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# VS Code settings (shared settings are okay, but ignore local ones)
+.vscode/settings.json
+
+# Build output
+dist/
+build/
+
+# Coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# Database files
+*.sqlite
+*.db
+
+# Arduino build output
+*.elf
+*.bin
+
+# Python cache (if used later)
+__pycache__/
+*.pyc
