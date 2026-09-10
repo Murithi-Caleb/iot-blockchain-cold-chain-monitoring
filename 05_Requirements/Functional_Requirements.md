@@ -1,4 +1,4 @@
-# Functional Requirements Specification
+# FUNCTIONAL REQUIREMENTS SPECIFICATION
 
 ## IoT and Blockchain-Based Cold Chain Monitoring and Produce Traceability System for Kenya's Horticultural Export Industry
 
@@ -7,39 +7,86 @@
 **Programme:** Bachelor of Science in Computer Science
 **University:** Dedan Kimathi University of Technology
 **Document:** Functional Requirements Specification
-**Version:** 1.0
-**Date:** 28 July 2026
-**Status:** Initial Draft
+**Version:** 2.0
+**Date:** 10 September 2026
+**Status:** Revised Requirements Baseline
 
 ---
 
-## 1. Introduction
+# 1. Introduction
 
-This document defines the functional requirements of the proposed IoT and Blockchain-Based Cold Chain Monitoring and Produce Traceability System for Kenya's horticultural export industry.
+This document defines the functional requirements of the proposed **IoT and Blockchain-Based Cold Chain Monitoring and Produce Traceability System for Kenya's horticultural export industry**.
 
-The system is intended to address challenges associated with monitoring environmental conditions during the storage and transportation of horticultural produce and maintaining reliable traceability records throughout the supply chain.
+The system is intended to address challenges associated with monitoring environmental conditions during the storage and transportation of horticultural produce and maintaining reliable, secure and traceable records throughout the supply chain.
 
 The proposed system will combine Internet of Things (IoT) sensors, a web-based monitoring dashboard, Blockchain technology, a database, and QR-code-based traceability.
 
-The functional requirements defined in this document will provide the foundation for the system architecture, database design, API development, IoT implementation, Blockchain integration, user interface development, and system testing.
+The IoT subsystem will collect environmental conditions such as temperature and humidity. The collected data will be transmitted to the backend system, stored in the appropriate database structures, and made available through the web-based dashboard for real-time and historical monitoring.
+
+Blockchain technology will be used to provide secure and tamper-resistant storage or verification of selected cold-chain and traceability records, while the QR-code mechanism will enable users to retrieve the traceability history of registered produce batches.
+
+The functional requirements defined in this document will provide the foundation for the system architecture, database design, API development, IoT implementation, Blockchain integration, user interface development, and system testing and evaluation.
 
 ---
 
 # 2. System Purpose
 
-The primary purpose of the system is to provide a digital mechanism for monitoring and recording environmental conditions affecting horticultural produce while also providing secure and traceable records of produce movement throughout the supply chain.
+The primary purpose of the system is to provide a digital mechanism for monitoring environmental conditions affecting horticultural produce while providing secure and traceable records of produce movement throughout the supply chain.
 
-The system will collect environmental data such as temperature and humidity from IoT sensors, transmit the collected data to the application server, store relevant information in the database, provide real-time visualization through a web dashboard, and maintain selected cold-chain records using Blockchain technology.
+The system shall:
 
-Each produce batch will also be associated with a unique QR code that can be used to retrieve relevant traceability information.
+* Collect temperature and humidity data using IoT sensors.
+* Transmit environmental measurements to the backend system.
+* Store environmental data for monitoring and historical analysis.
+* Provide real-time visualization of environmental conditions through a web dashboard.
+* Monitor environmental conditions against configured thresholds.
+* Generate alerts when configured environmental limits are exceeded.
+* Record relevant cold-chain and produce movement events.
+* Store selected critical records using Blockchain technology to improve integrity and tamper resistance.
+* Generate unique QR codes for produce batches.
+* Allow users to scan QR codes and retrieve relevant produce traceability information.
+* Maintain a chronological traceability history for produce batches.
+* Provide sufficient functionality and data to enable evaluation of the effectiveness of the proposed system.
+
+The system is intended as a prototype suitable for academic implementation and evaluation rather than as a complete commercial cold-chain management platform.
 
 ---
 
-# 3. System Users and Actors
+# 3. Project Objectives
+
+The system shall support the following four approved specific objectives.
+
+## Objective 1
+
+**To develop a web-based dashboard for real-time visualization of environmental conditions collected by the IoT sensors.**
+
+The IoT subsystem shall provide the environmental data required by the dashboard, including temperature and humidity measurements.
+
+## Objective 2
+
+**To implement Blockchain technology for secure and tamper-resistant storage of cold chain records.**
+
+The Blockchain component shall provide integrity and tamper-resistance mechanisms for selected critical cold-chain and traceability records.
+
+## Objective 3
+
+**To develop a QR-code-based produce traceability mechanism for tracking produce movement throughout the supply chain.**
+
+The traceability component shall allow produce batches to be uniquely identified and their relevant movement and handling history to be retrieved using QR codes.
+
+## Objective 4
+
+**To evaluate the effectiveness of the proposed system in improving cold chain monitoring and produce traceability.**
+
+The implemented system shall provide sufficient functionality and measurable outputs to allow its performance, reliability, integrity and traceability capabilities to be evaluated.
+
+---
+
+# 4. System Users and Actors
 
 The proposed system will involve the following primary actors.
 
-## 3.1 System Administrator
+## 4.1 System Administrator
 
 The administrator will be responsible for managing the system and maintaining system-level information.
 
@@ -60,9 +107,9 @@ The administrator shall be able to:
 
 ---
 
-## 3.2 Supply Chain Operator
+## 4.2 Supply Chain Operator
 
-A supply chain operator represents a user involved in handling, storing, or transporting horticultural produce.
+A supply chain operator represents a user involved in handling, storing or transporting horticultural produce.
 
 The operator shall be able to:
 
@@ -76,7 +123,7 @@ The operator shall be able to:
 
 ---
 
-## 3.3 System/IoT Device
+## 4.3 System/IoT Device
 
 The IoT device acts as an automated data source rather than a human user.
 
@@ -92,15 +139,15 @@ The IoT subsystem shall:
 
 ---
 
-## 3.4 Authorized Traceability User
+## 4.4 Authorized Traceability User
 
-An authorized user shall be able to use a QR code associated with a produce batch to retrieve relevant traceability information.
+An authorized traceability user shall be able to use a QR code associated with a produce batch to retrieve relevant traceability information.
 
-Depending on the final access-control design, this may include supply-chain personnel, administrators, or other authorized stakeholders.
+Depending on the final access-control design, this may include supply-chain personnel, administrators or other authorized stakeholders.
 
 ---
 
-# 4. Functional Requirements
+# 5. Functional Requirements
 
 ## FR-001: User Authentication
 
@@ -115,7 +162,7 @@ The system shall:
 * Prevent unauthorized access to protected system functions.
 * Allow authorized users to log out.
 
-**Related objective:** Supports the overall operation and security of the proposed system.
+**Related objectives:** Supports Objectives 1, 2 and 3.
 
 ---
 
@@ -130,13 +177,15 @@ The system shall:
 * Prevent unauthorized users from accessing administrative functionality.
 * Maintain user account information.
 
+**Related objectives:** Supports Objectives 1, 2 and 3.
+
 ---
 
 ## FR-003: Produce Batch Registration
 
 The system shall allow an authorized user to register a horticultural produce batch.
 
-A produce batch shall have a unique identifier.
+Each produce batch shall have a unique identifier.
 
 The system shall capture relevant information including, where applicable:
 
@@ -150,13 +199,15 @@ The system shall capture relevant information including, where applicable:
 * Registration date.
 * Current status.
 
+**Related objective:** Objective 3.
+
 ---
 
 ## FR-004: IoT Device Registration
 
 The system shall allow an administrator to register IoT monitoring devices.
 
-For each device, the system should maintain information such as:
+For each device, the system shall maintain information such as:
 
 * Device ID.
 * Sensor type.
@@ -165,6 +216,8 @@ For each device, the system should maintain information such as:
 * Assigned storage or transportation unit.
 * Installation date.
 * Last communication time.
+
+**Related objective:** Objective 1.
 
 ---
 
@@ -182,6 +235,8 @@ Each temperature record shall contain, at minimum:
 
 The system shall transmit collected measurements to the backend system.
 
+**Related objective:** Objective 1.
+
 ---
 
 ## FR-006: Humidity Data Collection
@@ -198,6 +253,8 @@ Each humidity record shall contain, at minimum:
 
 The system shall transmit collected measurements to the backend system.
 
+**Related objective:** Objective 1.
+
 ---
 
 ## FR-007: Periodic Sensor Data Transmission
@@ -213,6 +270,8 @@ The system shall:
 * Handle unsuccessful transmission attempts where technically feasible.
 
 The initial sampling interval shall be configurable during implementation and testing.
+
+**Related objective:** Objective 1.
 
 ---
 
@@ -231,6 +290,8 @@ The system shall maintain historical records containing:
 
 Historical records shall be retrievable for monitoring and analysis.
 
+**Related objectives:** Objectives 1 and 4.
+
 ---
 
 ## FR-009: Real-Time Environmental Monitoring
@@ -247,7 +308,7 @@ The dashboard shall display current:
 
 The dashboard shall update as new sensor measurements are received.
 
-**Related objective:** Specific Objective II.
+**Related objective:** Objective 1.
 
 ---
 
@@ -264,6 +325,8 @@ The system should provide suitable visualizations such as:
 * Historical readings for a selected monitoring device.
 
 The exact visualization mechanisms will be finalized during the user-interface design phase.
+
+**Related objectives:** Objectives 1 and 4.
 
 ---
 
@@ -282,6 +345,8 @@ For example:
 
 The exact threshold values will be determined from the horticultural produce requirements selected for the prototype.
 
+**Related objectives:** Objectives 1 and 4.
+
 ---
 
 ## FR-012: Environmental Alerts
@@ -299,6 +364,8 @@ The alert shall identify, where applicable:
 * Associated produce batch.
 
 The system shall display active alerts to authorized users through the dashboard.
+
+**Related objectives:** Objectives 1 and 4.
 
 ---
 
@@ -319,6 +386,8 @@ Examples of events include:
 
 Each event shall have an identifiable timestamp and relevant associated entities.
 
+**Related objectives:** Objectives 2 and 3.
+
 ---
 
 ## FR-014: Produce Movement Recording
@@ -337,6 +406,8 @@ The system shall maintain information about:
 
 This information will contribute to the traceability history of the produce.
 
+**Related objective:** Objective 3.
+
 ---
 
 ## FR-015: QR Code Generation
@@ -346,6 +417,8 @@ The system shall generate a unique QR code for a registered produce batch.
 Each QR code shall be associated with a unique batch identifier.
 
 The QR code shall provide a mechanism for retrieving the traceability information associated with the relevant batch.
+
+**Related objective:** Objective 3.
 
 ---
 
@@ -366,6 +439,8 @@ The information may include:
 * Relevant environmental monitoring information.
 * Timestamped traceability events.
 
+**Related objective:** Objective 3.
+
 ---
 
 ## FR-017: Produce Traceability History
@@ -382,7 +457,7 @@ The traceability history shall allow an authorized user to determine:
 6. Relevant environmental monitoring events.
 7. The current or final recorded destination.
 
-**Related objective:** Specific Objective IV.
+**Related objectives:** Objectives 3 and 4.
 
 ---
 
@@ -402,7 +477,7 @@ Potential Blockchain records include:
 
 The final Blockchain data model will be determined during the Blockchain architecture phase.
 
-**Related objective:** Specific Objective III.
+**Related objective:** Objective 2.
 
 ---
 
@@ -412,7 +487,9 @@ The system shall provide a mechanism for verifying the integrity or existence of
 
 The system shall allow authorized system components or users to retrieve relevant Blockchain information for verification.
 
-The implementation shall demonstrate that Blockchain records provide stronger tamper resistance than ordinary mutable application records.
+The implementation shall demonstrate that Blockchain records provide tamper-resistant integrity protection for selected records.
+
+**Related objectives:** Objectives 2 and 4.
 
 ---
 
@@ -423,10 +500,12 @@ The system shall integrate the Blockchain component with the application backend
 The system shall distinguish between:
 
 * Operational application data stored in the database.
-* Critical integrity-sensitive records stored on Blockchain.
+* Critical integrity-sensitive records or their integrity proofs stored on Blockchain.
 * References linking application records to corresponding Blockchain records.
 
 The architecture shall avoid unnecessarily storing large volumes of raw sensor data directly on the Blockchain where such storage would be inefficient.
+
+**Related objective:** Objective 2.
 
 ---
 
@@ -437,6 +516,8 @@ The system shall provide a mechanism for determining whether selected records ha
 Where applicable, the system may use cryptographic hashes or Blockchain transaction references to support integrity verification.
 
 A verification test shall be conducted during system evaluation.
+
+**Related objectives:** Objectives 2 and 4.
 
 ---
 
@@ -454,6 +535,8 @@ The dashboard should provide information such as:
 * Recent traceability events.
 * Blockchain record status.
 
+**Related objective:** Objective 1.
+
 ---
 
 ## FR-023: Search and Filtering
@@ -469,6 +552,8 @@ Users should be able to search or filter by criteria such as:
 * Location.
 * Transportation unit.
 * Environmental status.
+
+**Related objectives:** Objectives 1 and 3.
 
 ---
 
@@ -486,6 +571,8 @@ APIs shall support relevant operations including:
 * QR-code-related operations.
 * Blockchain record interaction.
 
+**Related objectives:** Objectives 1, 2 and 3.
+
 ---
 
 ## FR-025: Sensor Device Status Monitoring
@@ -500,6 +587,8 @@ Where technically feasible, the system shall identify:
 * Device identifier.
 
 This will assist in distinguishing missing sensor data from normal environmental conditions.
+
+**Related objectives:** Objectives 1 and 4.
 
 ---
 
@@ -516,7 +605,9 @@ Logs may include:
 * System errors.
 * Administrative actions.
 
-Logs shall support debugging, maintenance, and system evaluation.
+Logs shall support debugging, maintenance and system evaluation.
+
+**Related objectives:** Objectives 1, 2, 3 and 4.
 
 ---
 
@@ -536,6 +627,8 @@ The system should provide meaningful responses when:
 
 Errors shall be recorded where appropriate for troubleshooting and system maintenance.
 
+**Related objectives:** Objectives 1, 2 and 3.
+
 ---
 
 ## FR-028: System Data Export
@@ -544,107 +637,134 @@ The system should provide an appropriate mechanism for authorized users to expor
 
 The final export format will be determined during implementation.
 
----
-
-# 5. Functional Requirement Traceability
-
-Each functional requirement shall ultimately be associated with one or more project objectives.
-
-| Requirement Area                    | Main Project Objective |
-| ----------------------------------- | ---------------------- |
-| Temperature and humidity collection | Objective I            |
-| Environmental data transmission     | Objective I            |
-| Real-time dashboard                 | Objective II           |
-| Historical monitoring               | Objective II           |
-| Blockchain record creation          | Objective III          |
-| Blockchain verification             | Objective III          |
-| QR code generation                  | Objective IV           |
-| QR code scanning                    | Objective IV           |
-| Produce movement tracking           | Objective IV           |
-| Traceability history                | Objective IV           |
-| System evaluation and testing       | Objective V            |
+**Related objectives:** Objectives 1, 3 and 4.
 
 ---
 
-# 6. Objective-to-Function Mapping
+# 6. Functional Requirement Traceability
 
-## Objective I
+Each functional requirement shall ultimately be associated with one or more approved project objectives.
 
-**To design an IoT-based system for monitoring temperature and humidity during storage and transportation of horticultural produce.**
+| Requirement Area                        | Main Project Objective |
+| --------------------------------------- | ---------------------- |
+| IoT device registration                 | Objective 1            |
+| Temperature and humidity collection     | Objective 1            |
+| Environmental data transmission         | Objective 1            |
+| Environmental data storage              | Objective 1            |
+| Real-time dashboard                     | Objective 1            |
+| Historical environmental monitoring     | Objective 1            |
+| Environmental threshold monitoring      | Objective 1            |
+| Environmental alerts                    | Objective 1            |
+| Blockchain record creation              | Objective 2            |
+| Blockchain verification                 | Objective 2            |
+| Database–Blockchain integration         | Objective 2            |
+| Data integrity verification             | Objective 2            |
+| Produce batch registration              | Objective 3            |
+| QR code generation                      | Objective 3            |
+| QR code scanning                        | Objective 3            |
+| Produce movement tracking               | Objective 3            |
+| Traceability history                    | Objective 3            |
+| System testing and evaluation           | Objective 4            |
+| Sensor/data accuracy evaluation         | Objective 4            |
+| Dashboard performance evaluation        | Objective 4            |
+| Blockchain integrity evaluation         | Objective 4            |
+| QR-code traceability evaluation         | Objective 4            |
+| Overall system effectiveness evaluation | Objective 4            |
 
-Required system functions:
+---
 
-* Sensor registration.
+# 7. Objective-to-Function Mapping
+
+## Objective 1
+
+**To develop a web-based dashboard for real-time visualization of environmental conditions collected by the IoT sensors.**
+
+### Required supporting and system functions
+
+* IoT device registration.
 * Temperature measurement.
 * Humidity measurement.
 * Sensor data transmission.
 * Environmental data storage.
-* Device status monitoring.
-* Threshold monitoring.
-
----
-
-## Objective II
-
-**To develop a web-based dashboard for real-time visualization of environmental conditions.**
-
-Required system functions:
-
 * Real-time data retrieval.
 * Current temperature display.
 * Current humidity display.
-* Historical data visualization.
+* Historical environmental data visualization.
+* Environmental threshold monitoring.
 * Environmental alerts.
-* Monitoring status display.
+* Sensor device status monitoring.
+* Dashboard system overview.
+* Search and filtering.
+* Relevant API operations.
+
+The IoT subsystem is therefore treated as the **data acquisition component supporting the dashboard objective**, rather than as a separate project objective.
 
 ---
 
-## Objective III
+## Objective 2
 
 **To implement Blockchain technology for secure and tamper-resistant storage of cold chain records.**
 
-Required system functions:
+### Required system functions
 
 * Blockchain record creation.
 * Blockchain transaction management.
 * Blockchain record verification.
 * Database–Blockchain integration.
-* Data integrity verification.
+* Integrity verification.
+* Linking application records with corresponding Blockchain records.
+* Blockchain transaction/status monitoring.
+
+The system shall use Blockchain selectively for integrity-sensitive information rather than attempting to store all raw IoT sensor measurements directly on-chain.
 
 ---
 
-## Objective IV
+## Objective 3
 
 **To develop a QR-code-based produce traceability mechanism for tracking produce movement throughout the supply chain.**
 
-Required system functions:
+### Required system functions
 
 * Produce batch registration.
-* QR code generation.
-* QR code scanning.
-* Produce movement recording.
-* Traceability history.
+* Unique batch identification.
+* QR-code generation.
+* QR-code scanning.
 * Batch information retrieval.
+* Produce movement recording.
+* Storage and transportation event recording.
+* Traceability history.
+* Relevant environmental monitoring information retrieval.
+
+The traceability mechanism shall allow a user to determine the relevant movement history of a produce batch from its recorded origin through subsequent supply-chain events.
 
 ---
 
-## Objective V
+## Objective 4
 
 **To evaluate the effectiveness of the proposed system in improving cold chain monitoring and produce traceability.**
 
-Required system functions and evaluation capabilities:
+### Required evaluation capabilities
 
-* System testing.
-* Sensor accuracy evaluation.
-* Dashboard response evaluation.
-* Blockchain integrity testing.
-* QR-code traceability testing.
-* Performance measurement.
-* Requirement-to-test traceability.
+The system shall provide measurable outputs that allow evaluation of:
+
+* Environmental data collection.
+* Sensor/data accuracy where applicable.
+* Sensor data transmission reliability.
+* Dashboard responsiveness.
+* Real-time data update performance.
+* Environmental alert functionality.
+* Blockchain record integrity.
+* Blockchain verification capability.
+* QR-code scanning and retrieval accuracy.
+* Produce movement traceability.
+* System response time.
+* Overall requirement compliance.
+
+Evaluation shall be conducted using defined test cases, measurements and acceptance criteria.
 
 ---
 
-# 7. System Boundary
+# 8. System Boundary
 
 The proposed system will focus on monitoring and traceability activities occurring after horticultural produce enters the defined cold-chain monitoring process.
 
@@ -652,10 +772,11 @@ The project will include:
 
 * IoT-based environmental monitoring.
 * Temperature and humidity collection.
-* Data transmission.
+* Sensor data transmission.
 * Backend processing.
 * Database storage.
 * Web-based visualization.
+* Environmental threshold monitoring.
 * Environmental alerts.
 * Blockchain-based record integrity.
 * QR-code-based traceability.
@@ -674,11 +795,11 @@ The following areas are outside the initial implementation scope:
 * Commercial-scale fleet management.
 * Automated physical handling of produce.
 
-These exclusions will help maintain a realistic undergraduate project scope.
+These exclusions will help maintain a realistic undergraduate project scope while allowing the proposed system to demonstrate the four approved project objectives.
 
 ---
 
-# 8. Assumptions
+# 9. Assumptions
 
 The functional requirements are based on the following initial assumptions:
 
@@ -698,15 +819,17 @@ The functional requirements are based on the following initial assumptions:
 
 8. The exact horticultural produce and environmental thresholds used for testing will be finalized during the requirements and hardware research phase.
 
+9. The system will distinguish between operational data stored in the application database and selected integrity-sensitive records or proofs maintained through Blockchain.
+
 ---
 
-# 9. Requirement Priorities
+# 10. Requirement Priorities
 
 The following priority classification will be used during development.
 
-### Must Have
+## Must Have
 
-The following functions are essential to demonstrating the project's core objectives:
+The following functions are essential to demonstrating the four approved objectives:
 
 * Temperature monitoring.
 * Humidity monitoring.
@@ -720,7 +843,7 @@ The following functions are essential to demonstrating the project's core object
 * Blockchain record implementation.
 * Blockchain integrity verification.
 
-### Should Have
+## Should Have
 
 * Environmental alerts.
 * Historical graphs.
@@ -729,7 +852,7 @@ The following functions are essential to demonstrating the project's core object
 * System logging.
 * Data export.
 
-### Could Have
+## Could Have
 
 * Advanced analytics.
 * Additional environmental sensors.
@@ -740,13 +863,13 @@ Features classified as "Could Have" will only be implemented if sufficient time 
 
 ---
 
-# 10. Requirement Validation Strategy
+# 11. Requirement Validation Strategy
 
-Each functional requirement will eventually be converted into one or more test cases.
+Each functional requirement shall eventually be converted into one or more test cases.
 
 For example:
 
-### Requirement
+## Requirement
 
 **FR-005: Temperature Data Collection**
 
@@ -760,7 +883,21 @@ The backend receives and stores the temperature measurement together with the ap
 
 ---
 
-### Requirement
+## Requirement
+
+**FR-009: Real-Time Environmental Monitoring**
+
+### Test
+
+Generate or collect new temperature and humidity readings from the IoT sensors and observe the web dashboard.
+
+### Expected Result
+
+The dashboard displays the latest environmental measurements within the defined system update interval.
+
+---
+
+## Requirement
 
 **FR-015: QR Code Generation**
 
@@ -774,39 +911,97 @@ The system generates a unique QR code associated with the registered batch.
 
 ---
 
-### Requirement
+## Requirement
+
+**FR-016: QR Code Scanning and Traceability**
+
+### Test
+
+Scan the QR code associated with a registered produce batch.
+
+### Expected Result
+
+The system retrieves and displays the traceability information associated with the correct produce batch.
+
+---
+
+## Requirement
 
 **FR-018: Blockchain Record Creation**
 
 ### Test
 
-Create a defined cold-chain event and verify that the corresponding Blockchain record is generated.
+Create a defined cold-chain or traceability event and verify that the corresponding Blockchain record or integrity reference is generated.
 
 ### Expected Result
 
-A verifiable Blockchain transaction/reference is associated with the recorded event.
+A verifiable Blockchain transaction or integrity reference is associated with the recorded event.
 
 ---
 
-# 11. Requirement Traceability Principle
+## Requirement
+
+**FR-021: Data Integrity Verification**
+
+### Test
+
+Attempt to modify a selected record after its Blockchain integrity reference has been created.
+
+### Expected Result
+
+The system identifies that the stored record no longer corresponds to its original integrity reference.
+
+---
+
+# 12. Evaluation and Acceptance Criteria
+
+To support Objective 4, the system shall be evaluated using defined test cases and measurable criteria.
+
+The evaluation shall consider at least the following areas:
+
+| Evaluation Area          | Example Measurement                                |
+| ------------------------ | -------------------------------------------------- |
+| IoT data collection      | Successful sensor readings received                |
+| Data transmission        | Percentage of readings successfully transmitted    |
+| Dashboard                | Time taken for new readings to appear              |
+| Environmental monitoring | Correct display of temperature and humidity        |
+| Alerts                   | Correct detection of threshold violations          |
+| Blockchain               | Successful creation of integrity-protected records |
+| Blockchain verification  | Ability to detect record alteration                |
+| QR traceability          | Correct batch retrieved after scanning             |
+| Movement tracking        | Completeness of recorded movement history          |
+| System performance       | Response time for selected operations              |
+| Overall effectiveness    | Degree to which defined requirements are satisfied |
+
+The exact quantitative acceptance thresholds shall be established during system testing based on the prototype environment and available hardware.
+
+---
+
+# 13. Requirement Traceability Principle
 
 No major system feature will be implemented without identifying:
 
-1. The project objective it supports.
+1. The approved project objective it supports.
 2. The user or system actor that requires it.
 3. The data required by the function.
 4. The component responsible for implementing it.
 5. The test that will verify it.
 6. The evidence that will demonstrate successful implementation.
 
-This approach will ensure that the final system remains aligned with the approved project proposal.
+All functional requirements shall remain traceable to one or more of the four approved project objectives.
+
+This approach will ensure that the final system remains aligned with the approved project proposal and supervisor-approved scope.
 
 ---
 
-# 12. Document Status
+# 14. Document Status
 
-**Version:** 1.0
+**Version:** 2.0
 
-**Status:** Initial Requirements Baseline
+**Status:** Revised Requirements Baseline
 
-This document will remain under revision during the requirements analysis phase. Changes arising from supervisor feedback, technical feasibility studies, hardware availability, literature review findings, or project scope decisions shall be recorded in the project's Decision Log and reflected in subsequent versions of this document.
+This document has been revised to align the functional requirements with the four approved specific objectives of the project.
+
+The revision does not remove the IoT subsystem because IoT data collection is necessary to provide the environmental data required by the web-based monitoring dashboard. Instead, IoT functionality is treated as a supporting subsystem under Objective 1.
+
+Future changes arising from supervisor feedback, technical feasibility studies, hardware availability, literature review findings or project scope decisions shall be recorded in the project's Decision Log and reflected in subsequent versions of this document.
