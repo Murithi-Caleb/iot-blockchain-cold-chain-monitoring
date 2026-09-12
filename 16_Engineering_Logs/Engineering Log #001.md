@@ -12,7 +12,6 @@
 
 **Degree Programme:** Bachelor of Science in Computer Science
 
-**Project Supervisor:** ______________________
 
 **Log Number:** 001
 
@@ -22,9 +21,9 @@
 
 **Sprint:** Sprint 0 – Project Foundation
 
-**Working Hours:** ________ AM – ________ PM
+**Working Hours:** 10.45 AM – 3.22 PM
 
-**Total Hours Worked:** ________ Hours
+**Total Hours Worked:** 4 Hours
 
 ---
 
