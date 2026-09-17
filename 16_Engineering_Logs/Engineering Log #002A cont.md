@@ -9,7 +9,7 @@
 **University:** Dedan Kimathi University of Technology  
 
 **Mission:** #002A — Industry Fact-Finding & Requirements Validation   
-**Date:** 16 September 2026  
+**Date:** 16 September 2026  and 17 Sept 2026
 **Status:** In Progress
 
 ---
@@ -258,3 +258,5 @@ Requirement Comparison
 Validated / Refined / Added / Removed / Deferred
         ↓
 Final Requirements Baseline
+
+On 17th, that is today ,I made sure to interview Mr. Harrison, the details of the interview will be analysed tomorrow. 
