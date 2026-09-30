@@ -8,7 +8,5 @@ Cold Chain Logistics in Kenya: How Temperature-Controlled Supply Chains Are Tran
 5.	The same as in (4) above goes for the French beans: https://agrosocialservices.co.ke/french-beans-export-kenya/
 6.	Flower Cold chain conditions - Kenyan Flower Logistics — cold chain, air and ocean transport, sustainability standards | Cargo Flowers - Cargo Flowers
 7.	Where is all the Kenyan food? An article on the wastage happening in Kenya's food industry and the interventions underway. https://africa.wri.org/insights/turning-tap-food-loss-and-waste-kenya
-
-
-Why Africa is Still Losing Millions of Tons of Fresh Produce in 2026 - https://www.inspirafarms.com/why-africa-is-still-losing-millions-of-tons-of-fresh-produce-in-2026-and-how-cold-chain-innovation-can-change-that/
+8. Why Africa is Still Losing Millions of Tons of Fresh Produce in 2026 - https://www.inspirafarms.com/why-africa-is-still-losing-millions-of-tons-of-fresh-produce-in-2026-and-how-cold-chain-innovation-can-change-that/
 
