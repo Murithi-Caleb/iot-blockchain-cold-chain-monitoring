@@ -1,0 +1,73 @@
+@startuml
+autonumber
+skinparam monochrome true
+skinparam backgroundcolor white
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
+title UML Sequence Diagram – Main System Workflow\nBlockchain-Enabled IoT System for Produce Traceability and Cold Chain Monitoring
+
+actor "Supply Chain Operator" as Operator
+participant "Web Dashboard" as Dashboard
+participant "Backend System" as Backend
+participant "IoT Device (ESP32 + DHT22)" as IoT
+database "Database" as DB
+participant "Blockchain Network" as Blockchain
+
+== 1. LOGIN ==
+Operator -> Dashboard: Enter login credentials
+Dashboard -> Backend: Submit credentials
+Backend -> DB: Verify user credentials
+DB --> Backend: Authentication result
+Backend --> Dashboard: Login result
+Dashboard --> Operator: Display dashboard
+
+alt Invalid credentials
+    Backend --> Dashboard: Display login error
+    Dashboard --> Operator: Login failed
+end
+
+== 2. PRODUCE BATCH REGISTRATION ==
+Operator -> Dashboard: Enter produce batch details
+Dashboard -> Backend: Submit batch details
+Backend -> DB: Store produce batch
+DB --> Backend: Return batch ID
+Backend --> Dashboard: Generate/display batch QR code
+Dashboard --> Operator: Display QR code
+
+== 3. IoT ENVIRONMENTAL MONITORING ==
+IoT -> Backend: Send temperature and humidity reading\n(Temperature, Humidity, Timestamp, Device ID, Batch ID)
+Backend -> DB: Store environmental reading
+DB --> Backend: Confirm stored reading
+Backend -> Backend: Evaluate temperature/humidity thresholds
+
+== 4. ENVIRONMENTAL ALERT ==
+alt Threshold exceeded
+    Backend -> DB: Record environmental alert/event
+    Backend -> Dashboard: Send environmental alert
+    Dashboard -> Operator: Display alert
+else Within threshold
+    Backend -> Backend: Continue monitoring
+end
+
+== 5. COLD-CHAIN / TRACEABILITY EVENT ==
+Operator -> Dashboard: Record cold-chain event or produce movement
+Dashboard -> Backend: Submit event details
+Backend -> DB: Store event and movement record
+DB --> Backend: Confirm record
+
+== 6. BLOCKCHAIN RECORD ==
+Backend -> Blockchain: Submit critical event/hash
+Blockchain --> Backend: Return transaction confirmation/reference
+Backend -> DB: Store blockchain reference
+
+== 7. VIEW MONITORING AND TRACEABILITY INFORMATION ==
+Operator -> Dashboard: Request monitoring/traceability information
+Dashboard -> Backend: Request records
+Backend -> DB: Retrieve environmental, batch and traceability records
+DB --> Backend: Return records
+Backend --> Dashboard: Return monitoring and traceability information
+Dashboard --> Operator: Display dashboard and traceability information
+
+caption Figure 6: UML Sequence Diagram – Main System Workflow
+@enduml
