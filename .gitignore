@@ -39,3 +39,7 @@ temp/
 # Python cache (if used later)
 __pycache__/
 *.pyc
+# Backend Secrets
+07_Backend/serviceAccountKey.json
+07_Backend/.env
+07_Backend/node_modules/
