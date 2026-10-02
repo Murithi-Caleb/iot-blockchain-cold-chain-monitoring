@@ -1,0 +1,190 @@
+@startuml
+skinparam monochrome true
+skinparam backgroundcolor white
+hide circle
+skinparam linetype ortho
+
+title ERD v2 – Blockchain-Enabled IoT System for Produce Traceability and Cold Chain Monitoring\n(Resolves DR-07: adds ALERT, THRESHOLD_PROFILE, DEVICE_ASSIGNMENT; generalises BLOCKCHAIN_RECORD)
+
+entity "USER" as USER {
+  * user_id : PK
+  --
+  name
+  username
+  email
+  password_hash
+  role  <<ADMIN | OPERATOR | IMPORTER>>
+  status  <<ACTIVE | INACTIVE>>
+  created_at
+}
+
+entity "IOT_DEVICE" as IOT_DEVICE {
+  * device_id : PK
+  --
+  device_name
+  device_type
+  location
+  api_key_hash
+  sampling_interval_sec
+  status  <<ACTIVE | INACTIVE>>
+  last_seen_at
+  registered_at
+  # created_by : FK
+}
+
+entity "THRESHOLD_PROFILE" as THRESHOLD_PROFILE {
+  * profile_id : PK
+  --
+  produce_type  <<unique>>
+  min_temperature
+  max_temperature
+  min_humidity
+  max_humidity
+  breach_confirmations
+  recovery_confirmations
+  updated_at
+  # updated_by : FK
+}
+
+entity "PRODUCE_BATCH" as PRODUCE_BATCH {
+  * batch_id : PK
+  --
+  batch_code
+  produce_type
+  variety_grade
+  quantity
+  source_location
+  destination
+  harvest_date
+  registration_date
+  status  <<REGISTERED | IN_STORAGE | IN_TRANSIT | DELIVERED>>
+  # created_by : FK
+}
+
+entity "DEVICE_ASSIGNMENT" as DEVICE_ASSIGNMENT {
+  * assignment_id : PK
+  --
+  # device_id : FK
+  # batch_id : FK
+  assigned_at
+  unassigned_at  <<null = active>>
+  # assigned_by : FK
+}
+
+entity "ENVIRONMENTAL_READING" as ENVIRONMENTAL_READING {
+  * reading_id : PK
+  --
+  # device_id : FK
+  # batch_id : FK  <<nullable>>
+  # assignment_id : FK  <<nullable>>
+  temperature
+  humidity
+  recorded_at  <<device time>>
+  received_at  <<server time>>
+}
+
+entity "ALERT" as ALERT {
+  * alert_id : PK
+  --
+  # batch_id : FK
+  # device_id : FK
+  # event_id : FK
+  parameter  <<TEMPERATURE | HUMIDITY>>
+  threshold_min
+  threshold_max
+  peak_value
+  breach_count
+  status  <<OPEN | ACKNOWLEDGED | CLOSED>>
+  opened_at
+  closed_at
+  # acknowledged_by : FK
+  acknowledged_at
+}
+
+entity "COLD_CHAIN_EVENT" as COLD_CHAIN_EVENT {
+  * event_id : PK
+  --
+  # batch_id : FK
+  event_type
+  description
+  event_time
+  # recorded_by : FK  <<null if system-generated>>
+}
+
+entity "PRODUCE_MOVEMENT" as PRODUCE_MOVEMENT {
+  * movement_id : PK
+  --
+  # batch_id : FK
+  from_location
+  to_location
+  movement_time
+  # recorded_by : FK
+}
+
+entity "TRACEABILITY_RECORD" as TRACEABILITY_RECORD {
+  * traceability_id : PK
+  --
+  # batch_id : FK  <<unique>>
+  qr_id  <<opaque, non-guessable>>
+  qr_status  <<ACTIVE | REVOKED>>
+  created_at
+  updated_at
+}
+
+entity "BLOCKCHAIN_RECORD" as BLOCKCHAIN_RECORD {
+  * blockchain_id : PK
+  --
+  record_type  <<BATCH_REGISTERED | MOVEMENT | COLD_CHAIN_EVENT | EXCURSION_OPENED | EXCURSION_CLOSED | BATCH_CLOSED>>
+  record_ref_id  <<id of the anchored record>>
+  payload_hash
+  network
+  contract_address
+  transaction_hash
+  status  <<PENDING | CONFIRMED | FAILED>>
+  attempts
+  submitted_at
+  confirmed_at
+  verification_status
+}
+
+USER ||--o{ PRODUCE_BATCH : registers
+USER ||--o{ IOT_DEVICE : registers
+USER ||--o{ THRESHOLD_PROFILE : configures
+USER ||--o{ DEVICE_ASSIGNMENT : assigns
+USER ||--o{ COLD_CHAIN_EVENT : records
+USER ||--o{ PRODUCE_MOVEMENT : records
+USER ||--o{ ALERT : acknowledges
+
+THRESHOLD_PROFILE }o..o{ PRODUCE_BATCH : "applies by produce_type"
+
+IOT_DEVICE ||--o{ DEVICE_ASSIGNMENT : "assigned via"
+PRODUCE_BATCH ||--o{ DEVICE_ASSIGNMENT : "monitored via"
+
+IOT_DEVICE ||--o{ ENVIRONMENTAL_READING : generates
+PRODUCE_BATCH |o--o{ ENVIRONMENTAL_READING : "monitored by"
+DEVICE_ASSIGNMENT |o--o{ ENVIRONMENTAL_READING : "resolves"
+
+PRODUCE_BATCH ||--o{ ALERT : "triggers"
+IOT_DEVICE ||--o{ ALERT : "raises"
+ALERT ||--|| COLD_CHAIN_EVENT : "recorded as"
+
+PRODUCE_BATCH ||--o{ COLD_CHAIN_EVENT : has
+PRODUCE_BATCH ||--o{ PRODUCE_MOVEMENT : undergoes
+PRODUCE_BATCH ||--|| TRACEABILITY_RECORD : has
+
+TRACEABILITY_RECORD ..o{ BLOCKCHAIN_RECORD : "anchored (BATCH_REGISTERED)"
+COLD_CHAIN_EVENT ..o{ BLOCKCHAIN_RECORD : "anchored"
+PRODUCE_MOVEMENT ..o{ BLOCKCHAIN_RECORD : "anchored"
+
+note bottom of BLOCKCHAIN_RECORD
+  Polymorphic reference: record_type + record_ref_id.
+  Dotted lines = logical (service-layer) references,
+  not database foreign keys.
+end note
+
+note bottom of DEVICE_ASSIGNMENT
+  Prototype rule: one ACTIVE assignment per device
+  (enforced in service layer). Schema allows many-to-many.
+end note
+
+@enduml

@@ -1,0 +1,82 @@
+@startuml
+skinparam monochrome true
+skinparam backgroundcolor white
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor white
+skinparam NoteBackgroundColor white
+
+title UML Activity Diagram (v2) – Blockchain-Enabled IoT System for Produce Traceability and Cold Chain Monitoring\n(Resolves DR-01, DR-02, DR-03, DR-04, DR-06)
+
+|Supply Chain Operator|
+start
+:Register produce batch\n(type, quantity, origin, destination, harvest date);
+
+|System|
+:Validate input;
+:Generate opaque Batch ID\nand QR identifier;
+:Store batch and traceability record;
+:Submit BATCH_REGISTERED hash\nfor anchoring (see anchoring sub-flow);
+:Display QR code;
+
+|Supply Chain Operator|
+:Attach IoT device to batch;
+
+|System|
+:Verify device is ACTIVE\nand has no active assignment;
+:Create DEVICE_ASSIGNMENT;
+
+repeat
+  |IoT Device (ESP32 + DHT22)|
+  :Read temperature and humidity;
+  if (Sensor values valid?) then (yes)
+    :Package reading with\ntimestamp and Device ID;
+    :Send reading with device API key;
+    |System|
+    :Authenticate device and validate payload;
+    :Resolve batch from active DEVICE_ASSIGNMENT;
+    :Store reading in off-chain database;
+    :Evaluate thresholds for the batch's\nproduce type (breach / recovery counters);
+    if (Excursion opened or closed?) then (yes)
+      :Create or close ALERT\nand COLD_CHAIN_EVENT;
+      :Send alert to operator dashboard;
+      :Build canonical payload hash\nand create BLOCKCHAIN_RECORD (PENDING);
+      |Blockchain Network|
+      :Receive anchoring transaction;
+      if (Transaction confirmed?) then (yes)
+        |System|
+        :Store transaction hash,\nset status CONFIRMED;
+      else (no)
+        |System|
+        :Set status FAILED, log error,\nschedule retry;
+      endif
+    else (no)
+      :Continue monitoring\n(readings are NOT anchored);
+    endif
+  else (no)
+    :Discard reading and log sensor error;
+  endif
+  |IoT Device (ESP32 + DHT22)|
+  :Wait for next sampling interval;
+repeat while (Batch active and device assigned?) is (yes) not (no)
+
+|Supply Chain Operator|
+:Close batch on delivery;
+
+|System|
+:Unassign device;
+:(Optional) Anchor BATCH_CLOSED with\nMerkle root of batch readings;
+stop
+
+note right
+  Anchoring sub-flow (above) is reused by:
+  - BATCH_REGISTERED
+  - MOVEMENT
+  - COLD_CHAIN_EVENT
+  - EXCURSION_OPENED / EXCURSION_CLOSED
+  - BATCH_CLOSED
+  Raw readings are never written on-chain (DR-02).
+  Network: public testnet (Polygon Amoy) (DR-04).
+end note
+
+caption Figure 5 (v2): UML Activity Diagram
+@enduml

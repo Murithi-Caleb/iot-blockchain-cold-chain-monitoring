@@ -1,0 +1,98 @@
+@startuml
+autonumber
+skinparam monochrome true
+skinparam backgroundcolor white
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
+title UML Sequence Diagram (v2) – Main System Workflow\nBlockchain-Enabled IoT System for Produce Traceability and Cold Chain Monitoring
+
+actor "Supply Chain Operator" as Operator
+participant "Web Dashboard" as Dashboard
+participant "Backend System" as Backend
+participant "IoT Device (ESP32 + DHT22)" as IoT
+database "Database" as DB
+participant "Blockchain Network" as Blockchain
+
+== 1. LOGIN ==
+Operator -> Dashboard: Enter login credentials
+Dashboard -> Backend: Submit credentials
+Backend -> DB: Verify user (password hash)
+DB --> Backend: Authentication result
+alt Valid credentials
+    Backend --> Dashboard: Return access token (role claim)
+    Dashboard --> Operator: Display dashboard
+else Invalid credentials
+    Backend --> Dashboard: Login error
+    Dashboard --> Operator: Login failed
+end
+
+== 2. PRODUCE BATCH REGISTRATION AND DEVICE ASSIGNMENT ==
+Operator -> Dashboard: Enter produce batch details
+Dashboard -> Backend: Submit batch details (token)
+Backend -> DB: Store batch and traceability record
+DB --> Backend: Return Batch ID
+Backend --> Dashboard: Return QR identifier / QR code
+Dashboard --> Operator: Display QR code
+Backend -> Blockchain: Submit BATCH_REGISTERED hash (asynchronous, see 6)
+Operator -> Dashboard: Attach IoT device to batch
+Dashboard -> Backend: Create device assignment
+Backend -> DB: Store DEVICE_ASSIGNMENT (one active per device)
+
+== 3. IOT ENVIRONMENTAL MONITORING ==
+IoT -> Backend: Send reading + device API key\n(Temperature, Humidity, Timestamp, Device ID)
+Backend -> DB: Authenticate device and validate payload
+Backend -> DB: Resolve batch from active assignment
+Backend -> DB: Store environmental reading
+DB --> Backend: Confirm stored reading
+Backend --> IoT: Acknowledge (201)
+Backend -> Backend: Evaluate thresholds for produce type\n(breach / recovery counters)
+
+== 4. ENVIRONMENTAL ALERT (EXCURSION) ==
+alt Excursion opened or closed
+    Backend -> DB: Record ALERT and COLD_CHAIN_EVENT
+    Backend -> Dashboard: Send environmental alert
+    Dashboard -> Operator: Display alert
+    Operator -> Dashboard: Acknowledge alert
+    Dashboard -> Backend: Acknowledge
+    Backend -> DB: Update alert status
+else Within threshold or excursion already open
+    Backend -> Backend: Continue monitoring (no new event)
+end
+
+== 5. COLD-CHAIN / MOVEMENT EVENT ==
+Operator -> Dashboard: Record cold-chain event or produce movement
+Dashboard -> Backend: Submit event details (token)
+Backend -> DB: Store event / movement record
+DB --> Backend: Confirm record
+
+== 6. BLOCKCHAIN ANCHORING (EVENTS ONLY – NEVER RAW READINGS) ==
+Backend -> DB: Create BLOCKCHAIN_RECORD (PENDING, canonical payload hash)
+Backend -> Blockchain: Submit record hash
+alt Transaction confirmed
+    Blockchain --> Backend: Return transaction hash / confirmation
+    Backend -> DB: Store blockchain reference (CONFIRMED)
+else Failure or timeout
+    Backend -> DB: Mark FAILED and schedule retry
+end
+
+== 7. VIEW MONITORING AND TRACEABILITY INFORMATION ==
+Operator -> Dashboard: Request monitoring/traceability information
+Dashboard -> Backend: Request records (token)
+Backend -> DB: Retrieve environmental, batch and traceability records
+DB --> Backend: Return records
+Backend --> Dashboard: Return monitoring and traceability information
+Dashboard --> Operator: Display dashboard and traceability information
+
+== 8. INTEGRITY VERIFICATION ==
+Operator -> Dashboard: Verify record
+Dashboard -> Backend: Request verification
+Backend -> DB: Retrieve record and stored hash reference
+Backend -> Backend: Recompute canonical hash
+Backend -> Blockchain: Read anchored hash by transaction reference
+Blockchain --> Backend: Return anchored hash
+Backend --> Dashboard: Verified / Tampered
+Dashboard --> Operator: Display verification result
+
+caption Figure 6 (v2): UML Sequence Diagram – Main System Workflow
+@enduml
