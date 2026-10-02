@@ -7,13 +7,19 @@ import OperatorDashboard from './components/OperatorDashboard';
 import TraceabilityDashboard from './components/TraceabilityDashboard';
 import './App.css';
 
-// Helper to extract the exact role from Firebase Custom Claims
+// Updated helper to universally extract the role
 const getUserRole = (token) => {
   try {
     const decoded = jwtDecode(token);
+    
+    // Check if the backend agent stored it as a string
+    if (decoded.role) return decoded.role;
+    
+    // Check if the backend agent stored it as a boolean flag
     if (decoded.system_admin) return 'system_admin';
     if (decoded.supply_chain_operator) return 'supply_chain_operator';
     if (decoded.authorized_traceability_user) return 'authorized_traceability_user';
+    
     return null;
   } catch (err) {
     return null;
@@ -27,8 +33,6 @@ const RoleProtectedRoute = ({ children, requiredRole }) => {
 
   const userRole = getUserRole(token);
   if (userRole !== requiredRole) {
-    // If they are logged in but lack the specific role, send them back to login 
-    // (In a full app, you'd route them to a "403 Unauthorized" page)
     alert(`Access Denied: Requires ${requiredRole} privileges.`);
     return <Navigate to="/" />;
   }
@@ -43,7 +47,6 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         
-        {/* Admin Route: Only for system_admin */}
         <Route 
           path="/admin" 
           element={
@@ -53,7 +56,6 @@ function App() {
           } 
         />
 
-        {/* Operator Route: Only for supply_chain_operator */}
         <Route 
           path="/operator" 
           element={
@@ -63,7 +65,6 @@ function App() {
           } 
         />
 
-        {/* Traceability Route: Only for authorized_traceability_user */}
         <Route 
           path="/traceability" 
           element={

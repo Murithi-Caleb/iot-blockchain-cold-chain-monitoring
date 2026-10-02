@@ -12,6 +12,15 @@ function createApp({ auth, db }) {
   const app = express();
   app.use(cors());
   app.use(express.json());
+  // Security middleware for Supply Chain Operators
+  const requireOperator = (req, res, next) => {
+    if (!req.authUser) return res.status(401).json({ error: 'Unauthorized' });
+    
+    if (req.authUser.role === 'supply_chain_operator' || req.authUser.supply_chain_operator) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Forbidden: Requires Supply Chain Operator privileges.' });
+  };
 
   app.get('/api/auth/me', createAuthMiddleware(auth), (req, res) => {
     res.json({
@@ -26,7 +35,7 @@ function createApp({ auth, db }) {
 
   app.use('/api/admin', createAdminRouter(auth));
 
-  app.post('/api/batches', createAuthMiddleware(auth), requireSystemAdmin, async (req, res) => {
+  app.post('/api/batches', createAuthMiddleware(auth), requireOperator, async (req, res) => {
     try {
       const { produce_type, quantity, source_location } = req.body;
 

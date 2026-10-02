@@ -14,27 +14,29 @@ export default function Login() {
     e.preventDefault();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const token = await userCredential.user.getIdToken();
+      // NOTE: 'true' forces a refresh to get the new role immediately
+      const token = await userCredential.user.getIdToken(true); 
       sessionStorage.setItem('accessToken', token);
       
-      // Decode and route intelligently
       const decoded = jwtDecode(token);
-      if (decoded.system_admin) {
+      
+      // Check for boolean flag OR string format
+      if (decoded.system_admin || decoded.role === 'system_admin') {
         navigate('/admin');
-      } else if (decoded.supply_chain_operator) {
+      } else if (decoded.supply_chain_operator || decoded.role === 'supply_chain_operator') {
         navigate('/operator');
-      } else if (decoded.authorized_traceability_user) {
+      } else if (decoded.authorized_traceability_user || decoded.role === 'authorized_traceability_user') {
         navigate('/traceability');
       } else {
-        // Fallback for standard users with no custom claims yet
-        alert("Account pending role assignment.");
+        // This will print the EXACT token data to your screen
+        alert("Token data: " + JSON.stringify(decoded));
       }
     } catch (err) {
-    setError('Failed to log in. Check your credentials.');
+      setError('Failed to log in. Check your credentials.');
     }
   };
 
-   return (
+  return (
     <div style={{ maxWidth: '400px', margin: '100px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
       <h2>System Login</h2>
       {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -47,5 +49,3 @@ export default function Login() {
     </div>
   );
 }
-
-    
