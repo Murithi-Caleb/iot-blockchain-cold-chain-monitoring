@@ -15,12 +15,31 @@ function createApp({ auth, db }) {
   // Security middleware for Supply Chain Operators
   const requireOperator = (req, res, next) => {
     if (!req.authUser) return res.status(401).json({ error: 'Unauthorized' });
-    
+
     if (req.authUser.role === 'supply_chain_operator' || req.authUser.supply_chain_operator) {
       return next();
     }
     return res.status(403).json({ error: 'Forbidden: Requires Supply Chain Operator privileges.' });
   };
+
+  // Read-only batch access: any provisioned application role may view batches.
+  // Writing a batch stays operator-only (requireOperator above).
+  const requireBatchViewer = (req, res, next) => {
+    if (!req.authUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const viewerRoles = ['system_admin', 'supply_chain_operator', 'authorized_traceability_user'];
+    if (viewerRoles.some((role) => req.authUser.role === role || req.authUser[role] === true)) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Forbidden: No application role assigned.' });
+  };
+
+  // Batch IDs are generated server-side as BATCH-<timestamp>; reject anything else
+  // before it is used as a Realtime Database path segment.
+  const BATCH_ID_PATTERN = /^BATCH-\d{1,20}$/;
+  const MAX_LISTED_BATCHES = 200;
+  const DEFAULT_READINGS = 50;
+  const MAX_READINGS = 500;
 
   app.get('/api/auth/me', createAuthMiddleware(auth), (req, res) => {
     res.json({
@@ -63,6 +82,71 @@ function createApp({ auth, db }) {
       });
     } catch (error) {
       console.error('Error registering batch:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // List registered batches, newest first (capped). Read-only.
+  app.get('/api/batches', createAuthMiddleware(auth), requireBatchViewer, async (req, res) => {
+    try {
+      const snapshot = await db.ref('PRODUCE_BATCH').once('value');
+      const batches = Object.values(snapshot.val() || {})
+        .sort((a, b) => String(b.registration_date).localeCompare(String(a.registration_date)))
+        .slice(0, MAX_LISTED_BATCHES);
+
+      return res.json({ data: batches });
+    } catch (error) {
+      console.error('Error listing batches:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Look up a single batch by its traceability ID. Read-only.
+  app.get('/api/batches/:batchId', createAuthMiddleware(auth), requireBatchViewer, async (req, res) => {
+    try {
+      const { batchId } = req.params;
+      if (!BATCH_ID_PATTERN.test(batchId)) {
+        return res.status(400).json({ error: 'Invalid traceability ID format.' });
+      }
+
+      const snapshot = await db.ref(`PRODUCE_BATCH/${batchId}`).once('value');
+      const batch = snapshot.val();
+      if (!batch) {
+        return res.status(404).json({ error: 'No batch found for that traceability ID.' });
+      }
+
+      return res.json({ data: batch });
+    } catch (error) {
+      console.error('Error reading batch:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Most recent environmental readings for a batch (oldest to newest). Read-only.
+  app.get('/api/batches/:batchId/readings', createAuthMiddleware(auth), requireBatchViewer, async (req, res) => {
+    try {
+      const { batchId } = req.params;
+      if (!BATCH_ID_PATTERN.test(batchId)) {
+        return res.status(400).json({ error: 'Invalid traceability ID format.' });
+      }
+
+      const requested = Number.parseInt(req.query.limit, 10);
+      const limit = Number.isInteger(requested) && requested > 0
+        ? Math.min(requested, MAX_READINGS)
+        : DEFAULT_READINGS;
+
+      // Reading keys are READING-<epoch ms>, so key order is chronological.
+      const snapshot = await db
+        .ref(`ENVIRONMENTAL_READING/${batchId}`)
+        .orderByKey()
+        .limitToLast(limit)
+        .once('value');
+      const readings = Object.values(snapshot.val() || {})
+        .sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)));
+
+      return res.json({ data: readings });
+    } catch (error) {
+      console.error('Error reading environmental readings:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });

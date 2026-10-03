@@ -49,7 +49,23 @@ All `/api/admin/*` routes require a valid `system_admin` token.
 
 The API prevents an administrator from removing their own admin access and prevents disabling, demoting, or deleting the last active administrator. Email changes mark the address unverified. Firebase Authentication validates email addresses and account credentials. Administrative user changes are logged without passwords or email addresses.
 
-`POST /api/batches` now requires a system administrator token. Sensor ingestion remains unchanged in this implementation slice; device authentication and device registration are separate follow-up work.
+## Batch and sensor API
+
+| Method | Route | Required role | Purpose |
+|---|---|---|---|
+| `POST` | `/api/batches` | `supply_chain_operator` | Register a produce batch (`produce_type`, `quantity`, `source_location`). Returns the generated `traceability_id`. |
+| `GET` | `/api/batches` | any application role | List registered batches, newest first (capped at 200). |
+| `GET` | `/api/batches/:batchId` | any application role | Look up one batch by traceability ID (`BATCH-<digits>`). Returns 404 if unknown. |
+| `GET` | `/api/batches/:batchId/readings` | any application role | Most recent environmental readings for the batch, oldest to newest. Optional `limit` (default 50, max 500). |
+| `POST` | `/api/sensor-data` | none (unchanged) | Ingest a `device_id`, `batch_id`, `temperature`, `humidity` reading. |
+
+Batch registration is restricted to supply chain operators; system administrators and traceability users receive `403`. Reading batches is allowed for all three application roles; users with no role receive `403`.
+
+Sensor ingestion remains unauthenticated in this implementation slice; device authentication and device registration are separate follow-up work.
+
+## Admin bootstrap scripts
+
+`bootstrapAdmin.js` (preferred, via `npm run bootstrap-admin`) and `forceAdmin.js` both grant the initial administrator. The backend authorizes on the `role` custom claim, so `forceAdmin.js` now sets `role: 'system_admin'` as well as the legacy boolean `system_admin` flag. `forceAdmin.js` contains a hard-coded UID; edit it before use and never commit service-account files.
 
 ## Run and test
 

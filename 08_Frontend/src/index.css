@@ -1,111 +1,171 @@
+/* ==========================================================================
+   Design tokens + base styles
+   Cold Chain Monitoring & Produce Traceability System
+   Restrained, light, agriculture/logistics palette. No external fonts.
+   ========================================================================== */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Typography */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Surfaces and text */
+  --c-bg: #f3f6f4;
+  --c-surface: #ffffff;
+  --c-surface-muted: #f8faf9;
+  --c-border: #d6dfda;
+  --c-border-strong: #b4c2bb;
+  --c-text: #1a2622;
+  --c-text-muted: #4b5b54;
+  --c-text-faint: #5f6e67;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
+  /* Brand (deep leaf green) */
+  --c-primary: #1b6b47;
+  --c-primary-hover: #14543a;
+  --c-primary-soft: #e3f0e9;
+  --c-primary-border: #a9cdb9;
+
+  /* Navigation (dark green-slate) */
+  --c-nav-bg: #13221c;
+  --c-nav-text: #d3e0d9;
+  --c-nav-muted: #93a79c;
+  --c-nav-hover: #1b3027;
+  --c-nav-active: #24402f;
+  --c-nav-border: #263b32;
+
+  /* Status colours: always paired with text and a glyph, never colour alone */
+  --c-ok-bg: #e3f0e9;
+  --c-ok-text: #14543a;
+  --c-warn-bg: #fcf0cf;
+  --c-warn-text: #6f4300;
+  --c-danger-bg: #fbe4e1;
+  --c-danger-text: #9b1c1c;
+  --c-danger: #b42318;
+  --c-danger-hover: #8f1b12;
+  --c-info-bg: #e1ecf8;
+  --c-info-text: #174a85;
+  --c-neutral-bg: #e6ebe8;
+  --c-neutral-text: #3b4943;
+
+  /* Charts */
+  --c-chart-temperature: #c2410c;
+  --c-chart-humidity: #1d5fa8;
+  --c-chart-threshold: #8a6d1d;
+
+  --c-focus: #0b5fd1;
+
+  --radius: 6px;
+  --shadow-sm: 0 1px 2px rgba(19, 34, 28, 0.06);
+  --sidebar-width: 15.5rem;
+
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--c-text);
+  background: var(--c-bg);
+  color-scheme: light;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+#root {
+  min-height: 100svh;
+}
+
 h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: var(--c-text);
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: 1.5rem;
 }
+
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  font-size: 1.1rem;
 }
+
+h3 {
+  font-size: 1rem;
+}
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+a {
+  color: var(--c-primary);
+  text-underline-offset: 2px;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+a:hover {
+  color: var(--c-primary-hover);
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

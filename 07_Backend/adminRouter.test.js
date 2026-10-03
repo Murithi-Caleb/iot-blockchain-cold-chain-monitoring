@@ -23,7 +23,9 @@ function createFakeAuth(initialUsers) {
   const users = new Map(initialUsers.map((user) => [user.uid, structuredClone(user)]));
   const tokens = new Map([
     ['admin-token', { uid: 'admin-1', email: 'admin-1@example.test', role: 'system_admin' }],
-    ['operator-token', { uid: 'operator-1', email: 'operator-1@example.test', role: 'supply_chain_operator' }]
+    ['operator-token', { uid: 'operator-1', email: 'operator-1@example.test', role: 'supply_chain_operator' }],
+    ['traceability-token', { uid: 'trace-1', email: 'trace-1@example.test', role: 'authorized_traceability_user' }],
+    ['norole-token', { uid: 'norole-1', email: 'norole-1@example.test' }]
   ]);
   let nextUserId = 1;
   const revokedUsers = [];
@@ -90,6 +92,7 @@ let server;
 let request;
 let auth;
 let databaseWrites;
+let databaseStore;
 
 beforeEach(async () => {
   auth = createFakeAuth([
@@ -98,11 +101,44 @@ beforeEach(async () => {
     makeUser('operator-1', 'supply_chain_operator')
   ]);
   databaseWrites = [];
+  // Minimal Realtime Database fake: `set` records the write and stores the value;
+  // reads resolve against the stored values by exact path or direct child paths.
+  databaseStore = new Map();
   const db = {
     ref(path) {
+      const readSnapshot = (limit) => {
+        let value = databaseStore.has(path) ? structuredClone(databaseStore.get(path)) : null;
+        if (value === null) {
+          const children = [...databaseStore.entries()].filter(([key]) =>
+            key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes('/'));
+          if (children.length > 0) {
+            value = Object.fromEntries(children.map(([key, child]) => [key.slice(path.length + 1), structuredClone(child)]));
+          }
+        }
+        if (value && limit) {
+          const keys = Object.keys(value).sort().slice(-limit);
+          value = Object.fromEntries(keys.map((key) => [key, value[key]]));
+        }
+        return { val: () => value };
+      };
       return {
         async set(value) {
           databaseWrites.push({ path, value });
+          databaseStore.set(path, structuredClone(value));
+        },
+        async once() {
+          return readSnapshot();
+        },
+        orderByKey() {
+          return {
+            limitToLast(limit) {
+              return {
+                async once() {
+                  return readSnapshot(limit);
+                }
+              };
+            }
+          };
         }
       };
     }
@@ -140,8 +176,8 @@ describe('System Admin API', () => {
     const operatorRequest = await request('/api/admin/users', { token: 'operator-token' });
     assert.equal(operatorRequest.status, 403);
 
-    const batchRequest = await request('/api/batches', {
-      token: 'operator-token',
+    const adminBatchRequest = await request('/api/batches', {
+      token: 'admin-token',
       method: 'POST',
       body: JSON.stringify({
         produce_type: 'Avocado',
@@ -149,7 +185,7 @@ describe('System Admin API', () => {
         source_location: 'Nairobi'
       })
     });
-    assert.equal(batchRequest.status, 403);
+    assert.equal(adminBatchRequest.status, 403);
     assert.equal(databaseWrites.length, 0);
   });
 
@@ -220,19 +256,31 @@ describe('System Admin API', () => {
     assert.equal(auth.users.has('admin-1'), true);
   });
 
-  it('keeps batch registration admin-only while leaving sensor ingestion unchanged', async () => {
+  it('restricts batch registration to supply chain operators while leaving sensor ingestion unchanged', async () => {
+    const batchBody = JSON.stringify({
+      produce_type: 'Avocado',
+      quantity: 10,
+      source_location: 'Nairobi'
+    });
+
+    const anonymous = await request('/api/batches', { method: 'POST', body: batchBody });
+    assert.equal(anonymous.status, 401);
+
+    for (const token of ['admin-token', 'traceability-token', 'norole-token']) {
+      const forbidden = await request('/api/batches', { token, method: 'POST', body: batchBody });
+      assert.equal(forbidden.status, 403, `${token} must not register batches`);
+    }
+    assert.equal(databaseWrites.length, 0);
+
     const batchResponse = await request('/api/batches', {
-      token: 'admin-token',
+      token: 'operator-token',
       method: 'POST',
-      body: JSON.stringify({
-        produce_type: 'Avocado',
-        quantity: 10,
-        source_location: 'Nairobi'
-      })
+      body: batchBody
     });
     assert.equal(batchResponse.status, 201);
     assert.equal(databaseWrites.length, 1);
     assert.match(databaseWrites[0].path, /^PRODUCE_BATCH\/BATCH-/);
+    assert.equal((await batchResponse.json()).traceability_id, databaseWrites[0].value.batch_id);
 
     const sensorResponse = await request('/api/sensor-data', {
       method: 'POST',
@@ -245,6 +293,67 @@ describe('System Admin API', () => {
     });
     assert.equal(sensorResponse.status, 201);
     assert.equal(databaseWrites.length, 2);
+  });
+
+  it('lets every provisioned role read batches but rejects anonymous and role-less users', async () => {
+    databaseStore.set('PRODUCE_BATCH/BATCH-1000', {
+      batch_id: 'BATCH-1000',
+      produce_type: 'Avocado',
+      quantity: 10,
+      source_location: 'Nairobi',
+      registration_date: '2026-01-01T00:00:00.000Z',
+      status: 'In Transit'
+    });
+    databaseStore.set('PRODUCE_BATCH/BATCH-2000', {
+      batch_id: 'BATCH-2000',
+      produce_type: 'Mango',
+      quantity: 5,
+      source_location: 'Machakos',
+      registration_date: '2026-02-01T00:00:00.000Z',
+      status: 'In Transit'
+    });
+
+    assert.equal((await request('/api/batches')).status, 401);
+    assert.equal((await request('/api/batches', { token: 'norole-token' })).status, 403);
+
+    for (const token of ['admin-token', 'operator-token', 'traceability-token']) {
+      const listResponse = await request('/api/batches', { token });
+      assert.equal(listResponse.status, 200);
+      const listed = await listResponse.json();
+      assert.deepEqual(listed.data.map((batch) => batch.batch_id), ['BATCH-2000', 'BATCH-1000']);
+    }
+
+    const single = await request('/api/batches/BATCH-1000', { token: 'traceability-token' });
+    assert.equal(single.status, 200);
+    assert.equal((await single.json()).data.produce_type, 'Avocado');
+
+    assert.equal((await request('/api/batches/BATCH-9999', { token: 'operator-token' })).status, 404);
+    assert.equal((await request('/api/batches/not-a-batch', { token: 'operator-token' })).status, 400);
+    assert.equal((await request('/api/batches/BATCH-1000')).status, 401);
+  });
+
+  it('returns the most recent environmental readings for a batch in chronological order', async () => {
+    for (const [index, temperature] of [4.1, 4.4, 4.9].entries()) {
+      const key = `READING-${1000 + index}`;
+      databaseStore.set(`ENVIRONMENTAL_READING/BATCH-1000/${key}`, {
+        reading_id: key,
+        device_id: 'sensor-1',
+        batch_id: 'BATCH-1000',
+        temperature,
+        humidity: 90,
+        recorded_at: `2026-01-01T00:00:0${index}.000Z`
+      });
+    }
+
+    const response = await request('/api/batches/BATCH-1000/readings?limit=2', { token: 'traceability-token' });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).data.map((reading) => reading.temperature), [4.4, 4.9]);
+
+    const empty = await request('/api/batches/BATCH-2000/readings', { token: 'operator-token' });
+    assert.deepEqual((await empty.json()).data, []);
+
+    assert.equal((await request('/api/batches/BATCH-1000/readings')).status, 401);
+    assert.equal((await request('/api/batches/bad/readings', { token: 'operator-token' })).status, 400);
   });
 
   it('rejects invalid user roles and weak initial passwords', async () => {
