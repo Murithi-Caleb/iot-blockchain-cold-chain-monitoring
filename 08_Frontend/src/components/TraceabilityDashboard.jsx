@@ -13,6 +13,7 @@ import {
 } from '../lib/telemetry';
 import DashboardLayout from './layout/DashboardLayout';
 import TelemetryChart from './TelemetryChart';
+import VerificationPanel from './VerificationPanel';
 import PageHeader from './ui/PageHeader';
 import { Panel, StatCard } from './ui/Cards';
 import StatusBadge from './ui/StatusBadge';
@@ -56,8 +57,7 @@ export default function TraceabilityDashboard() {
     items.push(
       { id: 'trace', label: 'Traceability', to: '/traceability' },
       { heading: 'Planned modules' },
-      { id: 'alerts', label: 'Alerts', planned: true },
-      { id: 'verification', label: 'Blockchain Verification', planned: true }
+      { id: 'alerts', label: 'Alerts', planned: true }
     );
     return items;
   }, [session]);
@@ -250,6 +250,8 @@ function BatchRecord({ rawId }) {
 
       <EnvironmentalPanel batchId={batch.batch_id} />
 
+      <VerificationPanel batchId={batch.batch_id} />
+
       <Panel
         title="Traceability record"
         description="These parts of the full traceability record are not implemented yet."
@@ -262,10 +264,6 @@ function BatchRecord({ rawId }) {
           <div className="planned-card">
             <h3>Cold-chain events <StatusBadge>Planned</StatusBadge></h3>
             <p>Recorded temperature excursions and handling events for this batch.</p>
-          </div>
-          <div className="planned-card">
-            <h3>Blockchain verification <StatusBadge>Planned</StatusBadge></h3>
-            <p>Integrity status of critical records anchored on the blockchain. No verification has been performed.</p>
           </div>
         </div>
       </Panel>

@@ -3,11 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const { createAdminRouter, createAuthMiddleware, requireSystemAdmin } = require('./adminRouter');
 const { initializeFirebase } = require('./firebase');
+const { createLedgerFromEnv } = require('./blockchain/ledger');
+const {
+  LEDGER_DISABLED_VERIFICATION,
+  ServiceError,
+  createBlockchainService
+} = require('./blockchain/service');
 
-function createApp({ auth, db }) {
+// `ledger` is optional. When it is null/omitted the blockchain features are switched
+// off and every other endpoint behaves exactly as before.
+function createApp({ auth, db, ledger = null }) {
   if (!auth || !db) {
     throw new Error('Firebase Auth and Realtime Database instances are required.');
   }
+
+  const blockchain = ledger ? createBlockchainService({ db, ledger }) : null;
+
+  // Anchoring waits for a blockchain transaction to be mined, which can take several
+  // seconds. It runs in the background so API responses stay fast; progress is stored
+  // on the record (pending -> confirmed/failed) and shown by the verification endpoint.
+  const backgroundJobs = new Set();
+  const runInBackground = (promise) => {
+    const job = promise
+      .catch((error) => {
+        console.error('Background blockchain job failed:', error.code || error.name || 'unknown error');
+      })
+      .finally(() => backgroundJobs.delete(job));
+    backgroundJobs.add(job);
+  };
+  // Lets tests (and graceful shutdown) wait for in-flight anchoring to finish.
+  const settleBackgroundJobs = async () => {
+    while (backgroundJobs.size > 0) {
+      await Promise.all([...backgroundJobs]);
+    }
+  };
 
   const app = express();
   app.use(cors());
@@ -74,6 +103,13 @@ function createApp({ auth, db }) {
       };
 
       await db.ref(`PRODUCE_BATCH/${batch_id}`).set(batchData);
+
+      // Anchor the registration fingerprint on the blockchain without delaying the
+      // response. A ledger failure never fails the registration itself; the operator
+      // can retry from POST /api/batches/:batchId/anchor.
+      if (blockchain) {
+        runInBackground(blockchain.anchorBatchRegistration(batch_id));
+      }
 
       return res.status(201).json({
         message: 'Produce batch registered successfully.',
@@ -151,6 +187,83 @@ function createApp({ auth, db }) {
     }
   });
 
+  // --- Blockchain integrity endpoints ---------------------------------------
+  // Only SHA-256 fingerprints are written on-chain; batch details and sensor readings
+  // stay in the database and are re-hashed when verifying.
+
+  const requireValidBatchId = (req, res, next) => {
+    if (!BATCH_ID_PATTERN.test(req.params.batchId)) {
+      return res.status(400).json({ error: 'Invalid traceability ID format.' });
+    }
+    return next();
+  };
+
+  const requireLedger = (req, res, next) => {
+    if (!blockchain) {
+      return res.status(503).json({ error: 'Blockchain ledger is not configured on this server.' });
+    }
+    return next();
+  };
+
+  const sendServiceError = (res, error) => {
+    if (error instanceof ServiceError) {
+      const status = error.code === 'BATCH_NOT_FOUND' ? 404 : 400;
+      return res.status(status).json({ error: error.message });
+    }
+    console.error('Blockchain request failed:', error.code || error.name || 'unknown error');
+    return res.status(500).json({ error: 'Internal server error' });
+  };
+
+  // (Re)try anchoring the batch registration fingerprint. Safe to call repeatedly:
+  // an already-confirmed record is never changed.
+  app.post('/api/batches/:batchId/anchor', createAuthMiddleware(auth), requireOperator,
+    requireValidBatchId, requireLedger, async (req, res) => {
+      try {
+        const job = await blockchain.startBatchRegistration(req.params.batchId);
+        runInBackground(job.done);
+        return res.status(202).json({
+          message: 'Anchoring started.',
+          data: { record_key: job.recordKey }
+        });
+      } catch (error) {
+        return sendServiceError(res, error);
+      }
+    });
+
+  // Anchor one fingerprint covering the batch's recorded sensor readings so far.
+  app.post('/api/batches/:batchId/readings-digest', createAuthMiddleware(auth), requireOperator,
+    requireValidBatchId, requireLedger, async (req, res) => {
+      try {
+        const job = await blockchain.startReadingsDigest(req.params.batchId);
+        runInBackground(job.done);
+        return res.status(202).json({
+          message: 'Anchoring started.',
+          data: { record_key: job.recordKey, reading_count: job.readingCount }
+        });
+      } catch (error) {
+        return sendServiceError(res, error);
+      }
+    });
+
+  // Recompute fingerprints from the database and compare them with the chain.
+  app.get('/api/batches/:batchId/verification', createAuthMiddleware(auth), requireBatchViewer,
+    requireValidBatchId, async (req, res) => {
+      try {
+        const { batchId } = req.params;
+        const snapshot = await db.ref(`PRODUCE_BATCH/${batchId}`).once('value');
+        if (!snapshot.val()) {
+          return res.status(404).json({ error: 'No batch found for that traceability ID.' });
+        }
+
+        const data = blockchain
+          ? await blockchain.verifyBatch(batchId)
+          : LEDGER_DISABLED_VERIFICATION;
+        return res.json({ data });
+      } catch (error) {
+        return sendServiceError(res, error);
+      }
+    });
+
   app.post('/api/sensor-data', async (req, res) => {
     try {
       const { device_id, batch_id, temperature, humidity } = req.body;
@@ -212,13 +325,19 @@ function createApp({ auth, db }) {
     });
   });
 
+  app.locals.settleBackgroundJobs = settleBackgroundJobs;
+
   return app;
 }
 
 if (require.main === module) {
   try {
     const { auth, db } = initializeFirebase();
-    const app = createApp({ auth, db });
+    const ledger = createLedgerFromEnv();
+    console.log(ledger
+      ? 'Blockchain ledger enabled.'
+      : 'Blockchain ledger disabled (set BLOCKCHAIN_RPC_URL, BLOCKCHAIN_PRIVATE_KEY and BLOCKCHAIN_CONTRACT_ADDRESS to enable).');
+    const app = createApp({ auth, db, ledger });
     const port = process.env.PORT || 5000;
     app.listen(port, () => {
       console.log(`Cold Chain Backend running on port ${port}`);

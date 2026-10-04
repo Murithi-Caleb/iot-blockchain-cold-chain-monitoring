@@ -63,6 +63,30 @@ Batch registration is restricted to supply chain operators; system administrator
 
 Sensor ingestion remains unauthenticated in this implementation slice; device authentication and device registration are separate follow-up work.
 
+## Blockchain integrity layer
+
+Raw data stays in Firebase. Only SHA-256 fingerprints of selected critical records are written to the `ColdChainRegistry` smart contract (see `10_Blockchain`). Verification re-hashes the current database contents and compares the result with the fingerprint stored on-chain.
+
+Enable it by installing the one extra dependency and setting the variables in `.env.example`:
+
+```powershell
+npm install ethers
+```
+
+If `BLOCKCHAIN_RPC_URL`, `BLOCKCHAIN_PRIVATE_KEY` and `BLOCKCHAIN_CONTRACT_ADDRESS` are not all set, the server logs "Blockchain ledger disabled" and every other endpoint behaves as before.
+
+| Method | Route | Required role | Purpose |
+|---|---|---|---|
+| `POST` | `/api/batches/:batchId/anchor` | `supply_chain_operator` | Start (or retry) anchoring the batch registration fingerprint. Returns `202`; anchoring continues in the background. New batches are anchored automatically. |
+| `POST` | `/api/batches/:batchId/readings-digest` | `supply_chain_operator` | Anchor one fingerprint covering the batch's recorded sensor readings (latest 1000). Returns `400` if there are none. |
+| `GET` | `/api/batches/:batchId/verification` | any application role | Recompute fingerprints and compare with the chain. Returns an overall status and per-record details with transaction links. |
+
+Verification statuses: `verified`, `tampered` (database no longer matches the chain, or the chain record is missing), `partial`, `pending`, `failed`, `not_anchored`, `unavailable` (ledger not configured or unreachable).
+
+Firebase layout added: `BLOCKCHAIN_RECORD/{batchId}/{recordKey}` stores anchoring status, the fingerprint and the transaction hash. It is an index for the UI only; verification never trusts it.
+
+Code map: `blockchain/canonical.js` (deterministic hashing), `blockchain/ledger.js` (ethers adapter), `blockchain/service.js` (anchor/verify logic), `blockchain/abi.js` (contract ABI).
+
 ## Admin bootstrap scripts
 
 `bootstrapAdmin.js` (preferred, via `npm run bootstrap-admin`) and `forceAdmin.js` both grant the initial administrator. The backend authorizes on the `role` custom claim, so `forceAdmin.js` now sets `role: 'system_admin'` as well as the legacy boolean `system_admin` flag. `forceAdmin.js` contains a hard-coded UID; edit it before use and never commit service-account files.
