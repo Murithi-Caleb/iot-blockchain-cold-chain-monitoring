@@ -2,7 +2,7 @@
 const SERVER_URL = 'http://localhost:5000/api/sensor-data';
 
 // Replace this with the actual Traceability ID you generated in Postman
-const BATCH_ID = "BATCH-123456789"; 
+const BATCH_ID = "BATCH-1791228294744"; 
 const DEVICE_ID = "ESP32_SIMULATOR_01";
 
 function generateRandomReading(min, max) {
