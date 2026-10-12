@@ -221,3 +221,169 @@ describe('readings digest anchoring', () => {
     assert.deepEqual(byType, { BATCH_REGISTRATION: 'verified', READINGS_DIGEST: 'tampered' });
   });
 });
+
+describe('concurrent anchoring', () => {
+  it('sends one transaction and keeps the record confirmed when anchoring overlaps', async () => {
+    const [a, b, c] = await Promise.all([
+      service.anchorBatchRegistration(BATCH_ID),
+      service.anchorBatchRegistration(BATCH_ID),
+      service.anchorBatchRegistration(BATCH_ID)
+    ]);
+    assert.equal(ledger.anchorCalls, 1);
+    assert.deepEqual([a.status, b.status, c.status], ['confirmed', 'confirmed', 'confirmed']);
+    assert.equal(db.store.get(`BLOCKCHAIN_RECORD/${BATCH_ID}/registration`).status, 'confirmed');
+    assert.equal((await service.verifyBatch(BATCH_ID)).overall, 'verified');
+  });
+});
+
+describe('cold-chain event anchoring', () => {
+  const EVENT_ID = 'EVENT-1790000000000-TA';
+  const eventPath = (id = EVENT_ID) => `COLD_CHAIN_EVENT/${BATCH_ID}/${id}`;
+  const resolvedEvent = (overrides = {}) => ({
+    event_id: EVENT_ID,
+    batch_id: BATCH_ID,
+    produce_type: 'Avocado',
+    event_type: 'TEMPERATURE_EXCURSION',
+    metric: 'temperature',
+    direction: 'above',
+    severity: 'critical',
+    status: 'resolved',
+    started_at: '2026-10-01T08:00:00.000Z',
+    ended_at: '2026-10-01T08:01:00.000Z',
+    device_id: 'ESP32-1',
+    start_reading_id: 'READING-1',
+    threshold_min: 2,
+    threshold_max: 6,
+    unit: '°C',
+    profile_key: 'default',
+    profile_source: 'builtin',
+    peak_value: 9.5,
+    peak_at: '2026-10-01T08:00:20.000Z',
+    peak_deviation: 3.5,
+    reading_count: 6,
+    last_reading_at: '2026-10-01T08:00:50.000Z',
+    in_range_streak: 0,
+    acknowledged: false,
+    ...overrides
+  });
+  const seedEvent = (overrides) => db.store.set(eventPath(overrides?.event_id), resolvedEvent(overrides));
+
+  it('anchors a resolved event and verifies it', async () => {
+    seedEvent();
+    const record = await service.anchorEvent(BATCH_ID, EVENT_ID);
+    assert.equal(record.status, 'confirmed');
+    assert.equal(record.record_type, 'COLD_CHAIN_EVENT');
+    assert.equal(record.event_id, EVENT_ID);
+    assert.equal(ledger.chain.size, 1);
+
+    const result = await service.verifyBatch(BATCH_ID);
+    assert.equal(result.overall, 'verified');
+    assert.equal(result.records[0].event_id, EVENT_ID);
+  });
+
+  it('refuses events that do not exist or are still open', async () => {
+    await assert.rejects(service.anchorEvent(BATCH_ID, EVENT_ID), (e) =>
+      e instanceof ServiceError && e.code === 'EVENT_NOT_FOUND');
+
+    seedEvent({ status: 'open', ended_at: null });
+    await assert.rejects(service.anchorEvent(BATCH_ID, EVENT_ID), (e) =>
+      e instanceof ServiceError && e.code === 'EVENT_NOT_RESOLVED');
+    assert.equal(ledger.anchorCalls, 0);
+  });
+
+  it('detects tampering with each protected field', async () => {
+    const edits = {
+      peak_value: 6.5,
+      severity: 'warning',
+      ended_at: '2026-10-01T08:00:30.000Z',
+      started_at: '2026-10-01T08:00:10.000Z',
+      threshold_max: 12,
+      reading_count: 1,
+      direction: 'below',
+      device_id: 'ESP32-9'
+    };
+    for (const [field, value] of Object.entries(edits)) {
+      db = createFakeDb();
+      ledger = createFakeLedger();
+      service = createBlockchainService({ db, ledger, now: () => '2026-02-01T00:00:00.000Z' });
+      db.store.set(`PRODUCE_BATCH/${BATCH_ID}`, batch());
+      seedEvent();
+      await service.anchorEvent(BATCH_ID, EVENT_ID);
+
+      db.store.set(eventPath(), resolvedEvent({ [field]: value }));
+      const result = await service.verifyBatch(BATCH_ID);
+      assert.equal(result.overall, 'tampered', `editing ${field} must be detected`);
+    }
+  });
+
+  it('detects a deleted event', async () => {
+    seedEvent();
+    await service.anchorEvent(BATCH_ID, EVENT_ID);
+    db.store.delete(eventPath());
+    assert.equal((await service.verifyBatch(BATCH_ID)).overall, 'tampered');
+  });
+
+  it('does not flag acknowledgements, notes or working fields', async () => {
+    seedEvent();
+    await service.anchorEvent(BATCH_ID, EVENT_ID);
+    db.store.set(eventPath(), resolvedEvent({
+      acknowledged: true,
+      acknowledged_by: 'operator-1@example.test',
+      acknowledgement_note: 'Door was left open',
+      in_range_streak: 7,
+      produce_type: 'Something else'
+    }));
+    assert.equal((await service.verifyBatch(BATCH_ID)).overall, 'verified');
+  });
+
+  it('anchors every resolved event of a batch, skips open ones, and is repeatable', async () => {
+    seedEvent();
+    seedEvent({ event_id: 'EVENT-1790000100000-HB', metric: 'humidity', event_type: 'HUMIDITY_EXCURSION', direction: 'below' });
+    seedEvent({ event_id: 'EVENT-1790000200000-TA', status: 'open', ended_at: null });
+
+    const first = await service.startEventsAnchoring(BATCH_ID);
+    assert.equal(first.eventCount, 2);
+    await first.done;
+    assert.equal(ledger.chain.size, 2);
+
+    const again = await service.startEventsAnchoring(BATCH_ID);
+    await again.done;
+    assert.equal(ledger.anchorCalls, 2); // nothing re-sent
+
+    const result = await service.verifyBatch(BATCH_ID);
+    assert.equal(result.overall, 'verified');
+    assert.equal(result.records.length, 2);
+  });
+
+  it('reports a clear error when there is nothing to anchor', async () => {
+    await assert.rejects(service.startEventsAnchoring(BATCH_ID), (e) => e.code === 'NO_EVENTS');
+    seedEvent({ status: 'open', ended_at: null });
+    await assert.rejects(service.startEventsAnchoring(BATCH_ID), (e) => e.code === 'NO_EVENTS');
+    await assert.rejects(service.startEventsAnchoring('BATCH-404'), (e) => e.code === 'BATCH_NOT_FOUND');
+  });
+
+  it('retries a failed event anchor', async () => {
+    seedEvent();
+    ledger.failNext = true;
+    const failed = await service.anchorEvent(BATCH_ID, EVENT_ID);
+    assert.equal(failed.status, 'failed');
+    assert.equal((await service.verifyBatch(BATCH_ID)).overall, 'failed');
+
+    const job = await service.startEventsAnchoring(BATCH_ID);
+    await job.done;
+    assert.equal((await service.verifyBatch(BATCH_ID)).overall, 'verified');
+  });
+
+  it('keeps registration, readings and events as separate verified records', async () => {
+    seedReadings(2);
+    seedEvent();
+    await service.anchorBatchRegistration(BATCH_ID);
+    await service.anchorReadingsDigest(BATCH_ID);
+    await service.anchorEvent(BATCH_ID, EVENT_ID);
+
+    const result = await service.verifyBatch(BATCH_ID);
+    assert.equal(result.overall, 'verified');
+    assert.deepEqual(result.records.map((r) => r.record_type).sort(),
+      ['BATCH_REGISTRATION', 'COLD_CHAIN_EVENT', 'READINGS_DIGEST']);
+  });
+});

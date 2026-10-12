@@ -6,9 +6,11 @@ const { initializeFirebase } = require('./firebase');
 const { createLedgerFromEnv } = require('./blockchain/ledger');
 const {
   LEDGER_DISABLED_VERIFICATION,
-  ServiceError,
   createBlockchainService
 } = require('./blockchain/service');
+const { ServiceError, statusForServiceError } = require('./serviceError');
+const { createColdChainService } = require('./coldchain/service');
+const { createColdChainRouter } = require('./coldchain/routes');
 
 // `ledger` is optional. When it is null/omitted the blockchain features are switched
 // off and every other endpoint behaves exactly as before.
@@ -18,6 +20,7 @@ function createApp({ auth, db, ledger = null }) {
   }
 
   const blockchain = ledger ? createBlockchainService({ db, ledger }) : null;
+  const coldChain = createColdChainService({ db });
 
   // Anchoring waits for a blockchain transaction to be mined, which can take several
   // seconds. It runs in the background so API responses stay fast; progress is stored
@@ -26,7 +29,7 @@ function createApp({ auth, db, ledger = null }) {
   const runInBackground = (promise) => {
     const job = promise
       .catch((error) => {
-        console.error('Background blockchain job failed:', error.code || error.name || 'unknown error');
+        console.error('Background job failed:', error.code || error.name || 'unknown error');
       })
       .finally(() => backgroundJobs.delete(job));
     backgroundJobs.add(job);
@@ -187,6 +190,15 @@ function createApp({ auth, db, ledger = null }) {
     }
   });
 
+  // --- Cold-chain monitoring: thresholds, events and alerts -------------------
+  app.use('/api', createColdChainRouter({
+    authMiddleware: createAuthMiddleware(auth),
+    requireOperator,
+    requireBatchViewer,
+    requireSystemAdmin,
+    coldChain
+  }));
+
   // --- Blockchain integrity endpoints ---------------------------------------
   // Only SHA-256 fingerprints are written on-chain; batch details and sensor readings
   // stay in the database and are re-hashed when verifying.
@@ -207,8 +219,7 @@ function createApp({ auth, db, ledger = null }) {
 
   const sendServiceError = (res, error) => {
     if (error instanceof ServiceError) {
-      const status = error.code === 'BATCH_NOT_FOUND' ? 404 : 400;
-      return res.status(status).json({ error: error.message });
+      return res.status(statusForServiceError(error)).json({ error: error.message });
     }
     console.error('Blockchain request failed:', error.code || error.name || 'unknown error');
     return res.status(500).json({ error: 'Internal server error' });
@@ -239,6 +250,23 @@ function createApp({ auth, db, ledger = null }) {
         return res.status(202).json({
           message: 'Anchoring started.',
           data: { record_key: job.recordKey, reading_count: job.readingCount }
+        });
+      } catch (error) {
+        return sendServiceError(res, error);
+      }
+    });
+
+  // Anchor every RESOLVED cold-chain event of the batch that is not confirmed yet (this also
+  // retries failed ones). Events are anchored automatically when they resolve; this is for
+  // retries and for events that resolved while the ledger was switched off.
+  app.post('/api/batches/:batchId/events/anchor', createAuthMiddleware(auth), requireOperator,
+    requireValidBatchId, requireLedger, async (req, res) => {
+      try {
+        const job = await blockchain.startEventsAnchoring(req.params.batchId);
+        runInBackground(job.done);
+        return res.status(202).json({
+          message: 'Anchoring started.',
+          data: { event_count: job.eventCount }
         });
       } catch (error) {
         return sendServiceError(res, error);
@@ -288,6 +316,21 @@ function createApp({ auth, db, ledger = null }) {
       };
 
       await db.ref(`ENVIRONMENTAL_READING/${batch_id}/${reading_id}`).set(sensorData);
+
+      // Check the reading against the batch's threshold profile and open, update or
+      // resolve cold-chain events. This runs after the reading is safely stored and in the
+      // background, so a monitoring problem can never reject or slow down a sensor upload.
+      // Events that just resolved are then anchored on the blockchain (if enabled).
+      if (BATCH_ID_PATTERN.test(batch_id)) {
+        runInBackground(
+          coldChain.evaluateReading(sensorData).then(async (result) => {
+            if (!blockchain) return;
+            for (const event of result.resolved) {
+              await blockchain.anchorEvent(event.batch_id, event.event_id);
+            }
+          })
+        );
+      }
 
       return res.status(201).json({
         message: 'Sensor data recorded successfully.',

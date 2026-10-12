@@ -1005,3 +1005,9 @@
     border: 2px solid #000;
   }
 }
+
+/* Multi-line text field (alert acknowledgement note) */
+.field--area .input {
+  min-height: 5rem;
+  resize: vertical;
+}

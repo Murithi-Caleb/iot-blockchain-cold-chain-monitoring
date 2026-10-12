@@ -4,24 +4,41 @@
 // ledger stand-in. They let the anchoring/verification logic and the API routes be
 // tested without Firebase or a blockchain.
 
-// Minimal Realtime Database fake: `set` stores a subtree value; `once` returns the exact
-// value, or an object assembled from direct child paths (like a real parent read).
+// Minimal Realtime Database fake. `store` is a flat Map of exact paths to values (tests may
+// read and edit it directly to simulate tampering). Reading a path returns its exact value,
+// or an object assembled from every deeper path, like a parent read in the real database.
 function createFakeDb() {
   const store = new Map();
   const read = (path) => {
     if (store.has(path)) return structuredClone(store.get(path));
-    const children = [...store.entries()].filter(([key]) =>
-      key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes('/'));
-    if (children.length === 0) return null;
-    return Object.fromEntries(children.map(([key, value]) => [key.slice(path.length + 1), structuredClone(value)]));
+    const prefix = `${path}/`;
+    const descendants = [...store.entries()].filter(([key]) => key.startsWith(prefix));
+    if (descendants.length === 0) return null;
+    const result = {};
+    for (const [key, value] of descendants) {
+      const parts = key.slice(prefix.length).split('/');
+      let node = result;
+      for (const part of parts.slice(0, -1)) {
+        node[part] = node[part] || {};
+        node = node[part];
+      }
+      node[parts[parts.length - 1]] = structuredClone(value);
+    }
+    return result;
+  };
+  const clear = (path) => {
+    for (const key of [...store.keys()]) {
+      if (key === path || key.startsWith(`${path}/`)) store.delete(key);
+    }
   };
   return {
     store,
     ref: (path) => ({
       async set(value) {
-        for (const key of [...store.keys()]) if (key === path) store.delete(key);
+        clear(path);
         store.set(path, structuredClone(value));
       },
+      async remove() { clear(path); },
       async once() { return { val: () => read(path) }; }
     })
   };
@@ -38,10 +55,17 @@ function createFakeLedger() {
     readFails: false,
     async anchor({ recordId, batchKey, recordType, dataHash }) {
       this.anchorCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 1)); // mining takes time
       if (this.failNext) {
         this.failNext = false;
         const error = new Error('internal detail https://rpc.example/key=SECRET');
         error.shortMessage = 'execution reverted';
+        throw error;
+      }
+      // Like the real contract: a record ID can only be anchored once.
+      if (chain.has(recordId)) {
+        const error = new Error('internal detail');
+        error.shortMessage = 'execution reverted: RecordAlreadyExists';
         throw error;
       }
       chain.set(recordId, { dataHash, batchKey, recordType });

@@ -14,10 +14,12 @@
 // convenience index only: verification never trusts it and always recomputes the
 // record ID and compares against the chain itself.
 
+const { ServiceError } = require('../serviceError');
 const {
   RECORD_TYPES,
   RECORD_TYPE_NAMES,
   batchRegistrationPayload,
+  coldChainEventPayload,
   deriveKey,
   hashPayload,
   readingsDigestPayload
@@ -25,14 +27,6 @@ const {
 
 const REGISTRATION_KEY = 'registration';
 const MAX_DIGEST_READINGS = 1000;
-
-class ServiceError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.name = 'ServiceError';
-    this.code = code;
-  }
-}
 
 const compareKeys = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -67,10 +61,30 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
     return Object.entries(readings).sort(([a], [b]) => compareKeys(a, b));
   }
 
+  // Calls that anchor the same record run one after another. Without this, two
+  // overlapping calls (a double click, or automatic anchoring racing a manual retry) both
+  // see "not on-chain yet", both send a transaction, the second reverts, and the failure
+  // would overwrite the first call's "confirmed" status.
+  const recordQueues = new Map();
+  function withRecordLock(path, task) {
+    const previous = recordQueues.get(path) || Promise.resolve();
+    const run = previous.then(task, task);
+    const tail = run.catch(() => {});
+    recordQueues.set(path, tail);
+    tail.then(() => {
+      if (recordQueues.get(path) === tail) recordQueues.delete(path);
+    });
+    return run;
+  }
+
   // Core anchoring routine shared by every record type. Never throws for ledger
   // problems: failures are stored on the record with status "failed" so they can be
   // retried and shown to the user.
-  async function anchor({ batchId, recordKey, recordType, dataHash, meta = {} }) {
+  function anchor(args) {
+    return withRecordLock(recordPath(args.batchId, args.recordKey), () => anchorRecord(args));
+  }
+
+  async function anchorRecord({ batchId, recordKey, recordType, dataHash, meta = {} }) {
     const path = recordPath(batchId, recordKey);
 
     // A confirmed record is never overwritten; this keeps the audit trail intact and
@@ -185,6 +199,56 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
     };
   }
 
+  // Anchors one RESOLVED cold-chain event. An open event is still changing (peak value,
+  // reading count), so fingerprinting it would make normal updates look like tampering.
+  async function startEventAnchor(batchId, eventId) {
+    const event = await readValue(`COLD_CHAIN_EVENT/${batchId}/${eventId}`);
+    if (!event) throw new ServiceError('EVENT_NOT_FOUND', 'No such cold-chain event.');
+    if (event.status !== 'resolved') {
+      throw new ServiceError(
+        'EVENT_NOT_RESOLVED',
+        'Only resolved events can be anchored; this excursion is still in progress.'
+      );
+    }
+
+    const recordKey = `event-${eventId}`;
+    return {
+      recordKey,
+      done: anchor({
+        batchId,
+        recordKey,
+        recordType: RECORD_TYPES.COLD_CHAIN_EVENT,
+        dataHash: hashPayload(coldChainEventPayload(event)),
+        meta: { event_id: eventId }
+      })
+    };
+  }
+
+  // Anchors every resolved event of a batch that is not confirmed yet (also retries
+  // failed ones). Safe to call repeatedly.
+  async function startEventsAnchoring(batchId) {
+    const batch = await readBatch(batchId);
+    if (!batch) throw new ServiceError('BATCH_NOT_FOUND', 'No batch found for that traceability ID.');
+
+    const events = Object.values((await readValue(`COLD_CHAIN_EVENT/${batchId}`)) || {})
+      .filter((event) => event.status === 'resolved')
+      .sort((a, b) => compareKeys(a.started_at, b.started_at));
+    if (events.length === 0) {
+      throw new ServiceError('NO_EVENTS', 'No resolved cold-chain events exist for this batch yet.');
+    }
+
+    return {
+      eventCount: events.length,
+      done: (async () => {
+        const results = [];
+        for (const event of events) {
+          results.push(await (await startEventAnchor(batchId, event.event_id)).done);
+        }
+        return results;
+      })()
+    };
+  }
+
   // Recompute the fingerprint from the database as it is NOW. Returns null if the
   // source data no longer exists.
   async function recomputeHash(batchId, record) {
@@ -202,6 +266,12 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
       return hashPayload(readingsDigestPayload(inRange.map(([, reading]) => reading)));
     }
 
+    if (record.record_type_code === RECORD_TYPES.COLD_CHAIN_EVENT) {
+      if (!record.event_id) return null;
+      const event = await readValue(`COLD_CHAIN_EVENT/${batchId}/${record.event_id}`);
+      return event ? hashPayload(coldChainEventPayload(event)) : null;
+    }
+
     return null; // record types without a recompute rule cannot be verified yet
   }
 
@@ -215,6 +285,7 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
       block_number: record.block_number ?? null,
       anchored_at: record.anchored_at || null,
       reading_count: record.reading_count ?? null,
+      event_id: record.event_id || null,
       explorer_url: record.tx_hash ? ledger.explorerUrl(record.tx_hash) : null
     };
 
@@ -274,6 +345,9 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
     startReadingsDigest,
     anchorBatchRegistration: async (batchId) => (await startBatchRegistration(batchId)).done,
     anchorReadingsDigest: async (batchId) => (await startReadingsDigest(batchId)).done,
+    startEventAnchor,
+    startEventsAnchoring,
+    anchorEvent: async (batchId, eventId) => (await startEventAnchor(batchId, eventId)).done,
     verifyBatch
   };
 }

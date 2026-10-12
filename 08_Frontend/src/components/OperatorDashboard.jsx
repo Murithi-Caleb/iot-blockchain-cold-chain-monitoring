@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { getErrorMessage } from '../lib/api';
 import { formatDateTime, isSameLocalDay } from '../lib/format';
 import useBatches from '../lib/useBatches';
+import useEvents from '../lib/useEvents';
+import { produceKey } from '../lib/thresholds';
+import { EventsTable, EventsView, useCanAcknowledge } from './Events';
 import DashboardLayout from './layout/DashboardLayout';
 import BatchLabel from './BatchLabel';
 import PageHeader from './ui/PageHeader';
@@ -16,11 +19,11 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'register', label: 'Register Batch' },
   { id: 'batches', label: 'Produce Batches' },
+  { id: 'alerts', label: 'Alerts' },
+  { id: 'events', label: 'Cold Chain Events' },
   { heading: 'Planned modules' },
   { id: 'monitoring', label: 'Environmental Monitoring', planned: true },
-  { id: 'events', label: 'Cold Chain Events', planned: true },
-  { id: 'movement', label: 'Produce Movement', planned: true },
-  { id: 'alerts', label: 'Alerts', planned: true }
+  { id: 'movement', label: 'Produce Movement', planned: true }
 ];
 
 const PRODUCE_SUGGESTIONS = ['Avocados', 'French beans', 'Snow peas', 'Mangoes', 'Passion fruit', 'Cut flowers'];
@@ -43,6 +46,8 @@ export default function OperatorDashboard() {
       {view === 'dashboard' && (
         <OperatorOverview batches={batches} loading={loading} error={error} onNavigate={setView} />
       )}
+      {view === 'alerts' && <EventsView mode="alerts" />}
+      {view === 'events' && <EventsView mode="events" />}
       {view === 'register' && (
         <RegisterBatch onRegistered={reload} onViewBatches={() => setView('batches')} />
       )}
@@ -54,6 +59,8 @@ export default function OperatorDashboard() {
 }
 
 function OperatorOverview({ batches, loading, error, onNavigate }) {
+  const attention = useEvents({ status: 'attention', limit: 50, intervalMs: 10000 });
+  const canAcknowledge = useCanAcknowledge();
   const stats = useMemo(() => {
     const now = new Date();
     return {
@@ -80,7 +87,41 @@ function OperatorOverview({ batches, loading, error, onNavigate }) {
           <StatCard label="Registered batches" value={loading ? '…' : stats.total} meta="Most recent 200 shown" />
           <StatCard label="In transit" value={loading ? '…' : stats.inTransit} meta="Current batch status" />
           <StatCard label="Registered today" value={loading ? '…' : stats.today} meta="Local date" />
+          <StatCard
+            label="Open alerts"
+            value={attention.error ? null : attention.loading ? '…' : attention.events.filter((e) => e.status === 'open').length}
+            meta="Ongoing excursions"
+          />
+          <StatCard
+            label="Awaiting acknowledgement"
+            value={attention.error ? null : attention.loading ? '…' : attention.events.filter((e) => !e.acknowledged).length}
+            meta="Not yet acknowledged"
+          />
         </div>
+        <Panel
+          title="Needs attention"
+          description="Cold-chain excursions that are ongoing or not yet acknowledged."
+          actions={
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => onNavigate('alerts')}>
+              View all alerts
+            </button>
+          }
+          flush
+        >
+          {attention.loading && attention.events.length === 0 ? (
+            <LoadingState label="Loading alerts…" />
+          ) : attention.error ? (
+            <EmptyState title="Alerts could not be loaded">{attention.error}</EmptyState>
+          ) : (
+            <EventsTable
+              events={attention.events.slice(0, 5)}
+              showBatch
+              canAcknowledge={canAcknowledge}
+              onChanged={attention.reload}
+              emptyMessage="Nothing needs attention."
+            />
+          )}
+        </Panel>
         <Panel
           title="Recent batches"
           actions={
@@ -123,6 +164,19 @@ function RegisterBatch({ onRegistered, onViewBatches }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [registered, setRegistered] = useState(null);
+  const [profiles, setProfiles] = useState([]);
+
+  // Produce types that already have a threshold profile (hint only; failure is harmless).
+  useEffect(() => {
+    api.get('/api/thresholds')
+      .then((response) => setProfiles(response.data.data?.profiles || []))
+      .catch(() => setProfiles([]));
+  }, []);
+  const typedKey = produceKey(produceType);
+  const matched = profiles.some((p) => p.profile_key === typedKey);
+  const produceHint = !typedKey || profiles.length === 0 ? undefined
+    : matched ? 'Matches a threshold profile; its limits will be used.'
+      : 'No profile for this spelling; the default limits will be used.';
 
   const handleRegisterBatch = async (e) => {
     e.preventDefault();
@@ -204,10 +258,11 @@ function RegisterBatch({ onRegistered, onViewBatches }) {
               placeholder="e.g. Avocados"
               value={produceType}
               onChange={(e) => setProduceType(e.target.value)}
+              hint={produceHint}
               required
             />
             <datalist id="produce-suggestions">
-              {PRODUCE_SUGGESTIONS.map((name) => <option key={name} value={name} />)}
+              {[...new Set([...profiles.map((p) => p.produce_type), ...PRODUCE_SUGGESTIONS])].map((name) => <option key={name} value={name} />)}
             </datalist>
             <FormField
               id="batch-quantity"

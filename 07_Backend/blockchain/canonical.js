@@ -97,12 +97,38 @@ function readingsDigestPayload(readings) {
   return readings.map(readingPayload);
 }
 
+// Only the facts of a RESOLVED cold-chain event are hashed. Working fields (the in-range
+// streak) and human annotations (acknowledgement, notes) are excluded because they change
+// legitimately after the event is anchored. `?? null` makes a missing value and an
+// explicit null hash identically, since the database drops null fields.
+function coldChainEventPayload(event) {
+  return {
+    event_id: event.event_id,
+    batch_id: event.batch_id,
+    event_type: event.event_type,
+    metric: event.metric,
+    direction: event.direction,
+    severity: event.severity,
+    started_at: event.started_at,
+    ended_at: event.ended_at ?? null,
+    threshold_min: event.threshold_min,
+    threshold_max: event.threshold_max,
+    unit: event.unit,
+    peak_value: event.peak_value,
+    peak_at: event.peak_at ?? null,
+    reading_count: event.reading_count,
+    device_id: event.device_id ?? null,
+    start_reading_id: event.start_reading_id ?? null
+  };
+}
+
 module.exports = {
   HASH_SCHEME,
   RECORD_TYPES,
   RECORD_TYPE_NAMES,
   batchRegistrationPayload,
   canonicalize,
+  coldChainEventPayload,
   deriveKey,
   hashPayload,
   readingsDigestPayload,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import api, { getErrorMessage } from '../lib/api';
 import { getSession, ROLES, ROLE_LABELS } from '../lib/auth';
 import { formatDateTime } from '../lib/format';
+import ThresholdProfiles from './ThresholdProfiles';
 import DashboardLayout from './layout/DashboardLayout';
 import PageHeader from './ui/PageHeader';
 import { Panel, StatCard } from './ui/Cards';
@@ -14,6 +15,7 @@ import { EmptyState, LoadingState, Notice } from './ui/Feedback';
 const NAV_ITEMS = [
   { id: 'overview', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
+  { id: 'thresholds', label: 'Threshold Profiles' },
   { heading: 'Planned modules' },
   { id: 'devices', label: 'Devices', planned: true },
   { id: 'activity', label: 'System Activity', planned: true },
@@ -32,6 +34,7 @@ export default function AdminDashboard() {
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
   const [batchCount, setBatchCount] = useState(null);
+  const [openAlerts, setOpenAlerts] = useState(null);
 
   const [feedback, setFeedback] = useState(null); // { variant, text }
   const [busyUid, setBusyUid] = useState(null);
@@ -60,6 +63,9 @@ export default function AdminDashboard() {
     api.get('/api/batches')
       .then((response) => setBatchCount((response.data.data || []).length))
       .catch(() => setBatchCount(null));
+    api.get('/api/events', { params: { status: 'open' } })
+      .then((response) => setOpenAlerts((response.data.data || []).length))
+      .catch(() => setOpenAlerts(null));
   }, [loadUsers]);
 
   const counts = useMemo(() => ({
@@ -223,6 +229,7 @@ export default function AdminDashboard() {
               <StatCard label="Operators" value={usersLoading ? '…' : counts.operators} meta="Supply chain operators" />
               <StatCard label="Traceability users" value={usersLoading ? '…' : counts.traceability} meta="Authorized lookup accounts" />
               <StatCard label="Produce batches" value={batchCount} meta={batchCount === null ? '' : 'Registered in the system'} />
+              <StatCard label="Open alerts" value={openAlerts} meta={openAlerts === null ? '' : 'Ongoing excursions'} />
               <StatCard label="Registered devices" value={null} meta="Device registration is planned" />
             </div>
 
@@ -248,6 +255,16 @@ export default function AdminDashboard() {
               )}
             </Panel>
           </div>
+        </>
+      )}
+
+      {view === 'thresholds' && (
+        <>
+          <PageHeader
+            title="Threshold profiles"
+            description="Acceptable temperature and humidity ranges per produce type. Excursions outside these ranges become cold-chain events."
+          />
+          <ThresholdProfiles />
         </>
       )}
 

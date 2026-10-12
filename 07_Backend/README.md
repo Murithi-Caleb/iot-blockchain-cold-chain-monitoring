@@ -87,6 +87,33 @@ Firebase layout added: `BLOCKCHAIN_RECORD/{batchId}/{recordKey}` stores anchorin
 
 Code map: `blockchain/canonical.js` (deterministic hashing), `blockchain/ledger.js` (ethers adapter), `blockchain/service.js` (anchor/verify logic), `blockchain/abi.js` (contract ABI).
 
+## Cold-chain monitoring: thresholds, events and alerts
+
+Each batch is checked against a **threshold profile** (acceptable temperature and humidity range) chosen by its produce type: a profile whose key is the slug of the produce type (`Avocados` -> `avocados`), else the stored `default` profile, else a built-in 2-6 °C / 85-95 % placeholder. No produce-specific ranges are shipped; an administrator enters them (cite your source in the report).
+
+Every reading posted to `/api/sensor-data` is evaluated in the background after it is stored (a failure here never rejects a reading). An **excursion** is a continuous period outside the range for one metric and direction. It opens an **event** (`COLD_CHAIN_EVENT/{batchId}/{eventId}`), tracks the peak, and resolves after 2 consecutive in-range readings. Severity is `warning` up to 2 °C / 5 % beyond the limit and `critical` beyond it. Resolved events are anchored on the blockchain automatically (record type 2); open events are not, because they are still changing.
+
+| Method | Route | Role | Purpose |
+|---|---|---|---|
+| `GET` | `/api/thresholds` | any app role | Default and produce profiles. |
+| `PUT` | `/api/thresholds/:profileKey` | `system_admin` | Create/update a profile (`default` or a produce slug). Body: `produce_type`, `temperature_min/max`, `humidity_min/max`. |
+| `DELETE` | `/api/thresholds/:profileKey` | `system_admin` | Remove a produce profile (the default cannot be deleted). |
+| `GET` | `/api/events?status=&limit=` | any app role | Events across batches, newest first. `status`: `all`, `open`, `resolved`, `unacknowledged`, `attention`. |
+| `GET` | `/api/batches/:batchId/events` | any app role | Events of one batch. |
+| `GET` | `/api/batches/:batchId/thresholds` | any app role | The limits that apply to the batch and where they come from. |
+| `POST` | `/api/batches/:batchId/events/:eventId/acknowledge` | `supply_chain_operator` | Acknowledge an alert (optional `note`, 280 chars). |
+| `POST` | `/api/batches/:batchId/events/anchor` | `supply_chain_operator` | Anchor/retry all resolved events (needs the ledger). |
+
+Hashed event fields: id, batch, type, direction, severity, start/end, limits, unit, peak value/time, reading count, device. Acknowledgements and notes are not hashed (they change legitimately).
+
+Demo the alerts with the simulator, which now takes the batch ID as an argument:
+
+```powershell
+node mockSensor.js BATCH-1790981450938 --spike --interval=3
+```
+
+Limitations: a sensor that goes silent mid-excursion leaves its event open (device-offline detection is not built); `/api/sensor-data` is still unauthenticated.
+
 ## Admin bootstrap scripts
 
 `bootstrapAdmin.js` (preferred, via `npm run bootstrap-admin`) and `forceAdmin.js` both grant the initial administrator. The backend authorizes on the `role` custom claim, so `forceAdmin.js` now sets `role: 'system_admin'` as well as the legacy boolean `system_admin` flag. `forceAdmin.js` contains a hard-coded UID; edit it before use and never commit service-account files.

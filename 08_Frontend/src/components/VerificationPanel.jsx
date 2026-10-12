@@ -30,7 +30,8 @@ const RECORD_STATE = {
 
 const RECORD_LABEL = {
   BATCH_REGISTRATION: 'Batch registration',
-  READINGS_DIGEST: 'Sensor readings digest'
+  READINGS_DIGEST: 'Sensor readings digest',
+  COLD_CHAIN_EVENT: 'Cold-chain event'
 };
 
 const shorten = (value) => (value && value.length > 20 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value || '—');
@@ -99,6 +100,7 @@ export default function VerificationPanel({ batchId }) {
         <>
           <div className="table__primary">{RECORD_LABEL[record.record_type] || record.record_type}</div>
           {record.reading_count ? <div className="table__secondary">{record.reading_count} readings</div> : null}
+          {record.event_id ? <div className="table__secondary mono">{record.event_id}</div> : null}
         </>
       )
     },
@@ -191,6 +193,14 @@ export default function VerificationPanel({ batchId }) {
                 onClick={() => startAnchoring('readings-digest', 'Anchoring a fingerprint of the recorded readings…')}
               >
                 Anchor sensor readings
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={busy}
+                onClick={() => startAnchoring('events/anchor', 'Anchoring resolved cold-chain events…')}
+              >
+                Anchor cold-chain events
               </button>
             </div>
           )}

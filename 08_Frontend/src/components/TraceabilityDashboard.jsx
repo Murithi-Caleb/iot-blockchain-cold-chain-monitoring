@@ -12,6 +12,8 @@ import {
   useSimulatedTelemetry
 } from '../lib/telemetry';
 import DashboardLayout from './layout/DashboardLayout';
+import { BatchEventsPanel } from './Events';
+import { useBatchThresholds } from '../lib/thresholds';
 import TelemetryChart from './TelemetryChart';
 import VerificationPanel from './VerificationPanel';
 import PageHeader from './ui/PageHeader';
@@ -250,6 +252,8 @@ function BatchRecord({ rawId }) {
 
       <EnvironmentalPanel batchId={batch.batch_id} />
 
+      <BatchEventsPanel batchId={batch.batch_id} />
+
       <VerificationPanel batchId={batch.batch_id} />
 
       <Panel
@@ -260,10 +264,6 @@ function BatchRecord({ rawId }) {
           <div className="planned-card">
             <h3>Movement history <StatusBadge>Planned</StatusBadge></h3>
             <p>Custody and location changes along the supply chain will appear here as a timeline.</p>
-          </div>
-          <div className="planned-card">
-            <h3>Cold-chain events <StatusBadge>Planned</StatusBadge></h3>
-            <p>Recorded temperature excursions and handling events for this batch.</p>
           </div>
         </div>
       </Panel>
@@ -276,6 +276,8 @@ function BatchRecord({ rawId }) {
 // To go fully live later, remove the fallback branch; the chart and stats stay as is.
 function EnvironmentalPanel({ batchId }) {
   const recorded = useRecordedReadings(batchId);
+  const limits = useBatchThresholds(batchId);
+  const thresholds = limits.thresholds || DEFAULT_THRESHOLDS;
   const hasRecorded = recorded.readings.length > 0;
   const simulated = useSimulatedTelemetry({ enabled: !recorded.loading && !hasRecorded });
 
@@ -283,14 +285,14 @@ function EnvironmentalPanel({ batchId }) {
   const source = hasRecorded ? 'recorded' : 'simulated';
   const latest = data[data.length - 1];
 
-  const temperatureState = evaluateValue(latest.temperature, DEFAULT_THRESHOLDS.temperature);
-  const humidityState = evaluateValue(latest.humidity, DEFAULT_THRESHOLDS.humidity);
-  const excursions = data.filter((point) => isExcursion(point)).length;
+  const temperatureState = evaluateValue(latest.temperature, thresholds.temperature);
+  const humidityState = evaluateValue(latest.humidity, thresholds.humidity);
+  const excursions = data.filter((point) => isExcursion(point, thresholds)).length;
   const [tempVariant, tempText] = RANGE_BADGE[temperatureState];
   const [humVariant, humText] = RANGE_BADGE[humidityState];
   const outOfRange = temperatureState !== 'within' || humidityState !== 'within';
 
-  const { temperature: tempRange, humidity: humRange } = DEFAULT_THRESHOLDS;
+  const { temperature: tempRange, humidity: humRange } = thresholds;
 
   return (
     <Panel
@@ -344,10 +346,15 @@ function EnvironmentalPanel({ batchId }) {
             <StatCard label="Last reading" value={latest.time} meta={source === 'simulated' ? 'Simulated clock' : 'Device timestamp'} />
           </div>
 
-          <TelemetryChart data={data} />
+          <TelemetryChart data={data} thresholds={thresholds} />
           <p className="legend-note">
-            Dotted lines mark a placeholder acceptable temperature range ({tempRange.min}–{tempRange.max} {tempRange.unit}).
-            Configurable thresholds per produce type are a planned feature. Alerts are not stored yet.
+            Dotted lines mark the acceptable temperature range ({tempRange.min}–{tempRange.max} {tempRange.unit}),{' '}
+            {limits.info
+              ? `from the ${limits.info.source === 'produce' ? `${limits.info.label} profile` : 'default profile'}.`
+              : 'a placeholder shown until the batch\'s profile loads.'}{' '}
+            {source === 'simulated'
+              ? 'The simulated preview never creates alerts.'
+              : 'Excursions in recorded readings appear under Cold-chain events.'}
           </p>
           {source === 'recorded' && (
             <p className="legend-note">
