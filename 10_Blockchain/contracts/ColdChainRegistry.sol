@@ -16,8 +16,8 @@ contract ColdChainRegistry {
     // as long as they stay within MAX_RECORD_TYPE):
     //   0 = batch registration
     //   1 = environmental readings digest
-    //   2 = cold-chain event (reserved for the alerts/excursions phase)
-    //   3 = produce movement event (reserved for the movement phase)
+    //   2 = cold-chain event
+    //   3 = buyer compliance decision (acceptance or rejection)
     uint8 public constant MAX_RECORD_TYPE = 3;
 
     struct Record {

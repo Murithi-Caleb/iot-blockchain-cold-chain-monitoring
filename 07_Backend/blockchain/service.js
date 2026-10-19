@@ -20,12 +20,14 @@ const {
   RECORD_TYPE_NAMES,
   batchRegistrationPayload,
   coldChainEventPayload,
+  complianceDecisionPayload,
   deriveKey,
   hashPayload,
   readingsDigestPayload
 } = require('./canonical');
 
 const REGISTRATION_KEY = 'registration';
+const DECISION_KEY = 'decision';
 const MAX_DIGEST_READINGS = 1000;
 
 const compareKeys = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -249,6 +251,25 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
     };
   }
 
+  // Anchors the buyer's compliance decision (acceptance or rejection). A decision never
+  // changes once made, so the whole stored record is fingerprinted.
+  async function startDecisionAnchor(batchId) {
+    const decision = await readValue(`COMPLIANCE_DECISION/${batchId}`);
+    if (!decision) {
+      throw new ServiceError('DECISION_NOT_FOUND', 'No compliance decision has been recorded for this batch.');
+    }
+    return {
+      recordKey: DECISION_KEY,
+      done: anchor({
+        batchId,
+        recordKey: DECISION_KEY,
+        recordType: RECORD_TYPES.COMPLIANCE_DECISION,
+        dataHash: hashPayload(complianceDecisionPayload(decision)),
+        meta: { decision: decision.decision, decision_id: decision.decision_id }
+      })
+    };
+  }
+
   // Recompute the fingerprint from the database as it is NOW. Returns null if the
   // source data no longer exists.
   async function recomputeHash(batchId, record) {
@@ -272,6 +293,11 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
       return event ? hashPayload(coldChainEventPayload(event)) : null;
     }
 
+    if (record.record_type_code === RECORD_TYPES.COMPLIANCE_DECISION) {
+      const decision = await readValue(`COMPLIANCE_DECISION/${batchId}`);
+      return decision ? hashPayload(complianceDecisionPayload(decision)) : null;
+    }
+
     return null; // record types without a recompute rule cannot be verified yet
   }
 
@@ -286,6 +312,7 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
       anchored_at: record.anchored_at || null,
       reading_count: record.reading_count ?? null,
       event_id: record.event_id || null,
+      decision: record.decision || null,
       explorer_url: record.tx_hash ? ledger.explorerUrl(record.tx_hash) : null
     };
 
@@ -347,6 +374,8 @@ function createBlockchainService({ db, ledger, now = () => new Date().toISOStrin
     anchorReadingsDigest: async (batchId) => (await startReadingsDigest(batchId)).done,
     startEventAnchor,
     startEventsAnchoring,
+    startDecisionAnchor,
+    anchorDecision: async (batchId) => (await startDecisionAnchor(batchId)).done,
     anchorEvent: async (batchId, eventId) => (await startEventAnchor(batchId, eventId)).done,
     verifyBatch
   };

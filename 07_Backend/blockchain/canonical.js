@@ -16,7 +16,7 @@ const RECORD_TYPES = Object.freeze({
   BATCH_REGISTRATION: 0,
   READINGS_DIGEST: 1,
   COLD_CHAIN_EVENT: 2, // reserved: alerts/excursions phase
-  MOVEMENT_EVENT: 3 // reserved: produce movement phase
+  COMPLIANCE_DECISION: 3 // buyer's acceptance or rejection (certificate of compliance)
 });
 
 const RECORD_TYPE_NAMES = Object.freeze(
@@ -122,6 +122,34 @@ function coldChainEventPayload(event) {
   };
 }
 
+// The buyer's final decision, with the evidence fingerprints it was based on. Everything
+// in the stored record is hashed. A decision never changes after it is made, so any edit
+// counts as tampering.
+function complianceDecisionPayload(decision) {
+  return {
+    decision_id: decision.decision_id,
+    batch_id: decision.batch_id,
+    decision: decision.decision,
+    note: decision.note ?? null,
+    decided_by: decision.decided_by,
+    decided_uid: decision.decided_uid ?? null,
+    decided_at: decision.decided_at,
+    produce_type: decision.produce_type,
+    profile_key: decision.profile_key,
+    profile_source: decision.profile_source,
+    threshold_temperature_min: decision.threshold_temperature_min,
+    threshold_temperature_max: decision.threshold_temperature_max,
+    threshold_humidity_min: decision.threshold_humidity_min,
+    threshold_humidity_max: decision.threshold_humidity_max,
+    reading_count: decision.reading_count,
+    readings_digest: decision.readings_digest,
+    event_count: decision.event_count,
+    critical_event_count: decision.critical_event_count,
+    events_digest: decision.events_digest,
+    conditions_met: decision.conditions_met
+  };
+}
+
 module.exports = {
   HASH_SCHEME,
   RECORD_TYPES,
@@ -129,6 +157,7 @@ module.exports = {
   batchRegistrationPayload,
   canonicalize,
   coldChainEventPayload,
+  complianceDecisionPayload,
   deriveKey,
   hashPayload,
   readingsDigestPayload,

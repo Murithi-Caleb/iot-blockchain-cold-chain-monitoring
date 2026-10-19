@@ -11,6 +11,8 @@ const {
 const { ServiceError, statusForServiceError } = require('./serviceError');
 const { createColdChainService } = require('./coldchain/service');
 const { createColdChainRouter } = require('./coldchain/routes');
+const { createComplianceService } = require('./compliance/service');
+const { createComplianceRouter } = require('./compliance/routes');
 
 // `ledger` is optional. When it is null/omitted the blockchain features are switched
 // off and every other endpoint behaves exactly as before.
@@ -21,6 +23,7 @@ function createApp({ auth, db, ledger = null }) {
 
   const blockchain = ledger ? createBlockchainService({ db, ledger }) : null;
   const coldChain = createColdChainService({ db });
+  const compliance = createComplianceService({ db, blockchain });
 
   // Anchoring waits for a blockchain transaction to be mined, which can take several
   // seconds. It runs in the background so API responses stay fast; progress is stored
@@ -52,6 +55,18 @@ function createApp({ auth, db, ledger = null }) {
       return next();
     }
     return res.status(403).json({ error: 'Forbidden: Requires Supply Chain Operator privileges.' });
+  };
+
+  // Compliance decisions (certificate of compliance / rejection) belong to the buyer side:
+  // only the authorized traceability role may make them. Operators cannot certify their
+  // own batches and administrators manage accounts, not decisions.
+  const requireTraceabilityUser = (req, res, next) => {
+    if (!req.authUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (req.authUser.role === 'authorized_traceability_user' || req.authUser.authorized_traceability_user === true) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Forbidden: Requires Authorized Traceability User privileges.' });
   };
 
   // Read-only batch access: any provisioned application role may view batches.
@@ -199,6 +214,18 @@ function createApp({ auth, db, ledger = null }) {
     coldChain
   }));
 
+  // --- Buyer compliance decisions ---------------------------------------------
+  // A stored decision is anchored on the blockchain in the background (when enabled).
+  app.use('/api', createComplianceRouter({
+    authMiddleware: createAuthMiddleware(auth),
+    requireBatchViewer,
+    requireTraceabilityUser,
+    compliance,
+    onDecided: (record) => {
+      if (blockchain) runInBackground(blockchain.anchorDecision(record.batch_id));
+    }
+  }));
+
   // --- Blockchain integrity endpoints ---------------------------------------
   // Only SHA-256 fingerprints are written on-chain; batch details and sensor readings
   // stay in the database and are re-hashed when verifying.
@@ -268,6 +295,18 @@ function createApp({ auth, db, ledger = null }) {
           message: 'Anchoring started.',
           data: { event_count: job.eventCount }
         });
+      } catch (error) {
+        return sendServiceError(res, error);
+      }
+    });
+
+  // Retry anchoring a stored compliance decision (the buyer who decided can retry it).
+  app.post('/api/batches/:batchId/compliance/anchor', createAuthMiddleware(auth), requireTraceabilityUser,
+    requireValidBatchId, requireLedger, async (req, res) => {
+      try {
+        const job = await blockchain.startDecisionAnchor(req.params.batchId);
+        runInBackground(job.done);
+        return res.status(202).json({ message: 'Anchoring started.', data: { record_key: job.recordKey } });
       } catch (error) {
         return sendServiceError(res, error);
       }

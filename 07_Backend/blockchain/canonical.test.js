@@ -72,7 +72,7 @@ describe('canonical hashing', () => {
       BATCH_REGISTRATION: 0,
       READINGS_DIGEST: 1,
       COLD_CHAIN_EVENT: 2,
-      MOVEMENT_EVENT: 3
+      COMPLIANCE_DECISION: 3
     });
   });
 });

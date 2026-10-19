@@ -127,3 +127,21 @@ npm start
 ```
 
 The backend tests use Firebase Auth and database fakes, so they do not require project credentials or write to a live Firebase project.
+
+
+## Buyer compliance decisions (certificate of compliance)
+
+When a batch reaches the buyer, an **authorized traceability user** records one final decision:
+
+- **Accept** (issue a certificate of compliance): allowed only if the backend's checks pass: sensor readings exist, no excursion is in progress, every critical excursion was acknowledged, and (when the ledger is on) the batch registration and every resolved event are anchored and verified.
+- **Reject**: always allowed, but a reason is required.
+
+Decisions are stored at `COMPLIANCE_DECISION/{batchId}` (one per batch, never changed) together with fingerprints of the readings and events they were based on, then anchored as record type 3 (`COMPLIANCE_DECISION`). Editing or deleting a stored decision is detected by verification.
+
+| Method and path | Who |
+| --- | --- |
+| `GET /api/batches/:id/compliance` | any role: the decision, or the eligibility checks |
+| `POST /api/batches/:id/compliance` `{decision, note}` | traceability user only |
+| `POST /api/batches/:id/compliance/anchor` | traceability user only: retry anchoring |
+
+Operators and administrators cannot decide. No contract redeploy is needed: only a comment in `ColdChainRegistry.sol` changed (record type 3 was reserved and unused).

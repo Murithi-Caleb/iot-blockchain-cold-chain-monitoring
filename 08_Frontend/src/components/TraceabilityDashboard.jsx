@@ -13,6 +13,7 @@ import {
 } from '../lib/telemetry';
 import DashboardLayout from './layout/DashboardLayout';
 import { BatchEventsPanel } from './Events';
+import CompliancePanel from './CompliancePanel';
 import { useBatchThresholds } from '../lib/thresholds';
 import TelemetryChart from './TelemetryChart';
 import VerificationPanel from './VerificationPanel';
@@ -182,6 +183,8 @@ function BatchRecord({ rawId }) {
   const validId = BATCH_ID_PATTERN.test(batchId);
 
   const [state, setState] = useState({ loading: validId, batch: null, notFound: false, error: '' });
+  // Bumped after a buyer decision so the blockchain panel re-checks (the decision is anchored in the background).
+  const [verifyKey, setVerifyKey] = useState(0);
 
   const load = useCallback(async () => {
     setState({ loading: true, batch: null, notFound: false, error: '' });
@@ -254,7 +257,12 @@ function BatchRecord({ rawId }) {
 
       <BatchEventsPanel batchId={batch.batch_id} />
 
-      <VerificationPanel batchId={batch.batch_id} />
+      <CompliancePanel
+        batchId={batch.batch_id}
+        onDecided={() => setTimeout(() => setVerifyKey((key) => key + 1), 1200)}
+      />
+
+      <VerificationPanel batchId={batch.batch_id} refreshKey={verifyKey} />
 
       <Panel
         title="Traceability record"
