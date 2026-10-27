@@ -94,7 +94,7 @@ setInterval(async () => {
   } catch (error) {
     console.error(`[SIMULATOR] Connection error: ${error.message}`);
   }
-}, INTERVAL_SECONDS * 1000);
+}, INTERVAL_SECONDS * 1000); 
 
 console.log(
   `ESP32 Simulator started for ${BATCH_ID}: every ${INTERVAL_SECONDS}s, `
