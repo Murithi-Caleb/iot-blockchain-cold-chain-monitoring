@@ -6,6 +6,10 @@ logs/
 *.log
 npm-debug.log*
 
+# The wifi passwords
+09_IoT/**/secrets.h
+
+
 # Environment variables
 .env
 .env.local
